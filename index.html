@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>電子帳簿保存（年度管理SPA）</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&display=swap');
+
+body {
+  font-family: 'Noto Sans JP', "Helvetica Neue", Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f4f4f4;
+  color: #333;
+  line-height: 1.6;
+  font-weight: bold;
+  font-style: italic;
+}
+
+.container {
+  max-width: 800px;
+  margin: 20px auto;
+  background: #fff;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+
+h2 {
+  text-align: center;
+  letter-spacing: 0.1em;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+h3 {
+  font-size: 1.1rem;
+  color: #555;
+  border-left: 3px solid #d4a373;
+  padding-left: 15px;
+  margin-top: 30px;
+  margin-bottom: 20px;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background: #eee;
+  margin: 30px 0;
+}
+
+/* ボタン共通 */
+button {
+  background-color: #fff;
+  color: #555;
+  border: 1px solid #ddd;
+  padding: 10px 20px;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  margin: 5px;
+  outline: none;
+  font-weight: bold;
+  font-style: italic;
+}
+
+button:hover {
+  background-color: #f9f9f9;
+  border-color: #bbb;
+  transform: translateY(-2px);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+button:disabled {
+  background-color: #eee;
+  color: #aaa;
+  border-color: #eee;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* メインアクションボタン */
+#saveBtn, button[onclick="search()"], #initBtn {
+  background-color: #2c3e50;
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 10px rgba(44, 62, 80, 0.2);
+}
+
+#saveBtn:hover, button[onclick="search()"]:hover, #initBtn:hover {
+  background-color: #34495e;
+  box-shadow: 0 6px 15px rgba(44, 62, 80, 0.3);
+}
+
+/* ナビゲーション */
+.nav-bar {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin-bottom: 30px;
+}
+
+.nav-bar button {
+  border: none;
+  background: transparent;
+  color: #888;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 10px 30px;
+  margin: 0;
+}
+
+.nav-bar button:hover {
+  color: #d4a373;
+  background: transparent;
+  transform: none;
+}
+
+.nav-bar button.active {
+  color: #2c3e50;
+  border-bottom-color: #d4a373;
+}
+
+/* 年度タブ */
+#yearTabs {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+#yearTabs button {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #999;
+  font-size: 0.9rem;
+}
+
+#yearTabs button.active-year {
+  color: #d4a373;
+  border: 1px solid #d4a373;
+  background-color: #fff;
+}
+
+#yearSummary {
+  text-align: center;
+  font-size: 0.9rem;
+  color: #888;
+  margin-bottom: 20px;
+}
+
+/* フォーム要素 */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="file"] {
+  width: 100%;
+  padding: 12px 15px;
+  margin-bottom: 15px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font-size: 1rem;
+  background-color: #fafafa;
+  transition: border-color 0.3s;
+  font-weight: bold;
+  font-style: italic;
+}
+
+input:focus {
+  outline: none;
+  border-color: #d4a373;
+  background-color: #fff;
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+th {
+  background-color: #f8f8f8;
+  color: #555;
+  padding: 15px;
+  text-align: left;
+  border-bottom: 2px solid #eee;
+  border-right: none;
+  border-left: none;
+  border-top: none;
+}
+
+td {
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+  border-right: none;
+  border-left: none;
+  color: #666;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* その他UI */
+.view { display: none; }
+.view.active { 
+  display: block; 
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#cameraUI {
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+fieldset {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+legend {
+  color: #888;
+  padding: 0 10px;
+  font-size: 0.9rem;
+}
+
+/* トリミングモーダル */
+#cropModal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>電子帳簿保存（年度管理）</h2>
+
+<!-- 年度タブ -->
+<div id="yearTabs"></div>
+<div id="yearSummary"></div>
+
+<!-- ナビ -->
+<div class="nav-bar">
+  <button id="btn-capture" onclick="showView('capture')" class="active">登録</button>
+  <button id="btn-search" onclick="showView('search')">検索</button>
+  <button id="btn-maintenance" onclick="showView('maintenance')">保守</button>
+</div>
+
+<!-- 登録画面 -->
+<section id="capture" class="view active">
+  <h3>領収書登録</h3>
+  <input type="date" id="date"><br>
+  <input type="number" id="amount" placeholder="金額"><br>
+  <input type="text" id="vendor" placeholder="取引先"><br>
+  <div id="vendorHistory" style="margin-bottom: 10px; font-size: 0.85rem;"></div>
+  <input type="text" id="description" placeholder="内容"><br>
+  <div id="descHistory" style="margin-bottom: 10px; font-size: 0.85rem;"></div>
+  <input type="file" id="file" accept="image/*"><br><br>
+  <img id="preview" style="max-width:300px; display:none; margin-bottom:10px;">
+  <button type="button" id="cropBtn" onclick="startCropping()" style="display:none; margin-bottom:15px;">画像をトリミング</button><br>
+  <button type="button" onclick="startCamera()">カメラで撮影</button>
+  <div id="cameraUI" style="display:none; margin-top:10px; border:1px solid #ccc; padding:5px;">
+    <video id="cameraVideo" autoplay playsinline muted style="width:100%; max-width:400px;"></video>
+    <canvas id="cameraCanvas" style="display:none;"></canvas><br>
+    <button onclick="takePhoto()">撮影</button>
+    <button onclick="stopCamera()">閉じる</button>
+  </div><br><br>
+  <button id="saveBtn" onclick="save()">保存</button>
+  <button type="button" onclick="clearForm()">クリア</button>
+</section>
+
+<!-- トリミング用モーダル -->
+<div id="cropModal">
+  <div style="background:#fff; padding:10px; border-radius:8px; max-width:90%; max-height:90%; display:flex; flex-direction:column; width: 600px;">
+    <div style="flex:1; overflow:hidden; min-height:200px; background:#eee;">
+      <img id="cropImage" style="max-width:100%; max-height: 60vh; display:block;">
+    </div>
+    <div style="margin-top:10px; text-align:center;">
+      <button onclick="rotateImage(-90)">↺ 左回転</button>
+      <button onclick="rotateImage(90)">↻ 右回転</button>
+      <button onclick="applyCrop()">切り抜き確定</button>
+      <button onclick="cancelCrop()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- 検索画面 -->
+<section id="search" class="view">
+  <h3>検索</h3>
+  <input type="date" id="from">
+  <input type="date" id="to">
+  <input type="number" id="min" placeholder="最小金額">
+  <input type="number" id="max" placeholder="最大金額">
+  <input type="text" id="vendorSearch" placeholder="取引先">
+  <input type="text" id="descSearch" placeholder="内容">
+  <button onclick="search()">検索</button>
+  <button onclick="clearSearch()">クリア</button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>日付</th><th>金額</th><th>取引先</th><th>内容</th><th>保存日時</th><th>画像</th><th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="result"></tbody>
+  </table>
+</section>
+
+<!-- 保守画面 -->
+<section id="maintenance" class="view">
+  <h3>保守</h3>
+  <div style="text-align:right; margin-bottom:10px;">
+    <label style="font-size:0.9rem;">背景色: <input type="color" value="#fff3cd" oninput="document.querySelector('.container').style.backgroundColor=this.value"></label>
+  </div>
+  <fieldset>
+    <legend>バックアップ設定</legend>
+    <label>ファイル名接頭辞: <input type="text" id="backupPrefixInput" style="width:200px;"></label>
+    <button onclick="saveBackupPrefix()">設定保存</button>
+    <br>
+    <label style="margin-top:10px; display:block;"><input type="checkbox" id="backupDateCheck" onchange="saveBackupDate()"> ファイル名に日付(YYYYMMDD)を付与</label>
+  </fieldset>
+  <br>
+  <fieldset>
+    <legend>データ管理</legend>
+    <button onclick="backupYear(currentYear)">表示年度のデータをエクスポート</button>
+    <hr>
+    <div style="margin-top:10px;">
+      <label>バックアップ(JSON)から復元:</label><br>
+      <input type="file" id="importFile" accept=".json"><br>
+      <button onclick="importData()" style="margin-top:5px;">インポート実行</button>
+      <p style="font-size:0.8em; color:gray;">※同IDのデータは上書きされます(画像は復元されません)</p>
+    </div>
+  </fieldset>
+  <br>
+  <fieldset>
+    <legend>システム初期化</legend>
+    <button onclick="showResetUI()" id="initBtn">全データ初期化</button>
+    <div id="resetUI" style="display:none; border:1px solid red; padding:10px; margin-top:10px; background-color:#fff0f0;">
+      <p style="color:red; font-weight:bold;">データを完全に削除します。<br>実行するには初期化と入力して実行ボタンを押してください</p>
+      <p>承認ワードは&lt;初期化&gt;としてください</p>
+      <input type="text" id="resetConfirmInput" placeholder="初期化">
+      <button onclick="executeReset()">実行</button>
+      <button onclick="hideResetUI()">キャンセル</button>
+    </div>
+  </fieldset>
+  <br>
+  <fieldset>
+    <legend>前年度ロック設定</legend>
+    <p>現在の状態: <span id="lockStatus" style="font-weight:bold;"></span></p>
+    <button onclick="toggleLock(true)" id="lockBtn">前年度ロック</button>
+    <button onclick="toggleLock(false)" id="unlockBtn">ロック解除</button>
+  </fieldset>
+  <br>
+  <fieldset>
+    <legend>履歴表示設定</legend>
+    <label>入力履歴の表示数: <input type="number" id="historyLimitInput" style="width:50px;" min="1" max="20"></label>
+    <button onclick="saveHistoryLimit()">設定保存</button>
+  </fieldset>
+</section>
+
+<script>
+/* ===== SPA基本 ===== */
+function showView(id) {
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  
+  document.querySelectorAll(".nav-bar button").forEach(b => b.classList.remove("active"));
+  const btn = document.getElementById("btn-" + id);
+  if(btn) btn.classList.add("active");
+
+  const container = document.querySelector(".container");
+  if (id === "capture") container.style.backgroundColor = "#fff0f5"; // 薄いピンク
+  else if (id === "search") container.style.backgroundColor = "#f0f8ff"; // 薄い青
+  else if (id === "maintenance") container.style.backgroundColor = "#fff3cd"; // 警戒色（薄い黄色）
+
+  if (id === "capture" && db) {
+    updateVendorHistory();
+    updateDescHistory();
+  }
+}
+
+/* ===== IndexedDB ===== */
+let db;
+const req = indexedDB.open("receiptDB", 2);
+req.onupgradeneeded = e => {
+  db = e.target.result;
+  const store = e.oldVersion < 1 ? db.createObjectStore("receipts", { keyPath: "id" }) : e.target.transaction.objectStore("receipts");
+  
+  if (!store.indexNames.contains("fiscalYear")) store.createIndex("fiscalYear", "fiscalYear", { unique: false });
+  if (!store.indexNames.contains("date")) store.createIndex("date", "date", { unique: false });
+  if (!store.indexNames.contains("amount")) store.createIndex("amount", "amount", { unique: false });
+  if (!store.indexNames.contains("vendor")) store.createIndex("vendor", "vendor", { unique: false });
+};
+req.onsuccess = e => {
+  db = e.target.result;
+  initYearTabs();
+  updateYearSummary();
+  updateVendorHistory();
+  updateDescHistory();
+  updateLockUI();
+  initHistoryLimit();
+  initBackupPrefix();
+  showView('capture');
+};
+
+/* ===== 年度管理 ===== */
+const CURRENT_YEAR = new Date().getFullYear().toString();
+const YEARS = [
+  CURRENT_YEAR - 1 + "",
+  CURRENT_YEAR,
+  (Number(CURRENT_YEAR) + 1) + ""
+];
+let currentYear = CURRENT_YEAR;
+
+/* 年度タブ生成 */
+function initYearTabs() {
+  const y = document.getElementById("yearTabs");
+  YEARS.forEach(v => {
+    const b = document.createElement("button");
+    b.textContent = v + "年度";
+    b.onclick = () => {
+      currentYear = v;
+      highlightYear();
+      search();
+      updateYearSummary();
+    };
+    y.appendChild(b);
+  });
+  highlightYear();
+}
+
+/* 過年度ロック */
+function highlightYear() {
+  [...yearTabs.children].forEach(b => {
+    if (b.textContent.startsWith(currentYear)) b.classList.add("active-year");
+    else b.classList.remove("active-year");
+    b.style.fontWeight = ""; // 以前のスタイルをクリア
+  });
+  // ロック中かつ現在年度でない場合は保存ボタン無効
+  if (currentYear !== CURRENT_YEAR && isPastLocked) {
+    saveBtn.disabled = true;
+  } else {
+    saveBtn.disabled = false;
+  }
+}
+
+/* ===== ロック機能 ===== */
+let isPastLocked = localStorage.getItem("isPastLocked") !== "false"; // デフォルトはロック(true)
+
+function toggleLock(locked) {
+  isPastLocked = locked;
+  localStorage.setItem("isPastLocked", locked);
+  updateLockUI();
+  highlightYear();
+  alert(locked ? "過去の年度をロックしました" : "ロックを解除しました");
+}
+
+function updateLockUI() {
+  const status = document.getElementById("lockStatus");
+  if (status) {
+    status.textContent = isPastLocked ? "ロック中 (編集不可)" : "解除中 (編集可)";
+    status.style.color = isPastLocked ? "red" : "blue";
+  }
+  document.getElementById("lockBtn").disabled = isPastLocked;
+  document.getElementById("unlockBtn").disabled = !isPastLocked;
+}
+
+/* ===== バックアップ設定 ===== */
+let backupPrefix = localStorage.getItem("backupPrefix") || "クリニック";
+let isBackupDate = localStorage.getItem("isBackupDate") === "true";
+
+function initBackupPrefix() {
+  const input = document.getElementById("backupPrefixInput");
+  if (input) input.value = backupPrefix;
+  const check = document.getElementById("backupDateCheck");
+  if (check) check.checked = isBackupDate;
+}
+
+function saveBackupPrefix() {
+  const input = document.getElementById("backupPrefixInput");
+  const val = input.value.trim();
+  if (!val) return alert("接頭辞を入力してください");
+  
+  backupPrefix = val;
+  localStorage.setItem("backupPrefix", backupPrefix);
+  alert("設定を保存しました");
+}
+
+function saveBackupDate() {
+  const check = document.getElementById("backupDateCheck");
+  isBackupDate = check.checked;
+  localStorage.setItem("isBackupDate", isBackupDate);
+}
+
+function getYYYYMMDD() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return y + m + day;
+}
+
+/* ===== 履歴設定 ===== */
+let historyLimit = Number(localStorage.getItem("historyLimit")) || 5;
+
+function initHistoryLimit() {
+  const input = document.getElementById("historyLimitInput");
+  if (input) input.value = historyLimit;
+}
+
+function saveHistoryLimit() {
+  const input = document.getElementById("historyLimitInput");
+  const val = Number(input.value);
+  if (val < 1) return alert("1以上の数値を入力してください");
+  
+  historyLimit = val;
+  localStorage.setItem("historyLimit", historyLimit);
+  alert("設定を保存しました");
+}
+
+/* ===== カメラ機能 ===== */
+let stream;
+
+async function startCamera() {
+  const video = document.getElementById("cameraVideo");
+  const ui = document.getElementById("cameraUI");
+  
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+  }
+  
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert("カメラAPIが使用できません。\n(file://形式ではこの機能は使えません)\n\n【代替策】\n上の「ファイルを選択」ボタンを押してください。\nスマホの標準カメラを起動して撮影できます。");
+    return;
+  }
+
+  try {
+    // モバイル向けに背面カメラを優先、PC等はフォールバック
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: "environment",
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      });
+    } catch (e) {
+      // 初回失敗時は制約なしで再試行
+      // 権限拒否の場合は再試行せずエラーにする
+      if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+        throw e;
+      }
+      // 制約エラーなどの場合は、制約なし（デフォルトカメラ）で再試行
+      console.warn("Camera constraints failed, retrying with defaults:", e);
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+    video.srcObject = stream;
+    video.onloadedmetadata = () => {
+      video.play().catch(e => console.error("Video play error:", e));
+    };
+    ui.style.display = "block";
+  } catch (err) {
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      alert("カメラの使用が許可されていません。\n(file://形式ではこの機能は使えません)\n\n【代替策】\n上の「ファイルを選択」ボタンを押してください。\nスマホの標準カメラを起動して撮影できます。");
+    } else {
+      alert("カメラ起動エラー: " + err.name + "\n" + err.message);
+    }
+  }
+}
+
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+  }
+  document.getElementById("cameraUI").style.display = "none";
+}
+
+function takePhoto() {
+  const video = document.getElementById("cameraVideo");
+  const canvas = document.getElementById("cameraCanvas");
+  
+  if (!stream) return;
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
+  canvas.toBlob(blob => {
+    const f = new File([blob], `capture_${Date.now()}.png`, { type: "image/png" });
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    file.files = dt.files;
+
+    preview.src = URL.createObjectURL(f);
+    preview.style.display = "block";
+    document.getElementById("cropBtn").style.display = "inline-block";
+    
+    stopCamera();
+    alert("撮影しました");
+  }, "image/png");
+}
+
+/* ===== ファイル選択時プレビュー ===== */
+file.onchange = function() {
+  const f = this.files[0];
+  if (f && f.type.startsWith("image/")) {
+    preview.src = URL.createObjectURL(f);
+    preview.style.display = "block";
+    document.getElementById("cropBtn").style.display = "inline-block";
+  } else {
+    preview.style.display = "none";
+    document.getElementById("cropBtn").style.display = "none";
+  }
+};
+
+/* ===== クリア ===== */
+function clearForm() {
+  date.value = "";
+  amount.value = "";
+  vendor.value = "";
+  description.value = "";
+  file.value = "";
+  preview.src = "";
+  preview.style.display = "none";
+  document.getElementById("cropBtn").style.display = "none";
+}
+
+/* ===== トリミング機能 ===== */
+let cropper;
+
+function startCropping() {
+  const f = file.files[0];
+  if (!f) return;
+  
+  const modal = document.getElementById("cropModal");
+  const img = document.getElementById("cropImage");
+  
+  // モーダル表示前に画像をセット
+  img.src = URL.createObjectURL(f);
+  modal.style.display = "flex";
+  
+  // Cropper初期化
+  if (cropper) cropper.destroy();
+  cropper = new Cropper(img, {
+    viewMode: 1,
+    autoCropArea: 0.9,
+  });
+}
+
+function rotateImage(degree) {
+  if (cropper) cropper.rotate(degree);
+}
+
+function applyCrop() {
+  if (!cropper) return;
+  
+  cropper.getCroppedCanvas().toBlob((blob) => {
+    const originalFile = file.files[0];
+    const newFile = new File([blob], originalFile.name, { type: "image/png" });
+    
+    const dt = new DataTransfer();
+    dt.items.add(newFile);
+    file.files = dt.files;
+    
+    preview.src = URL.createObjectURL(newFile);
+    cancelCrop();
+  }, "image/png");
+}
+
+function cancelCrop() {
+  document.getElementById("cropModal").style.display = "none";
+  if (cropper) cropper.destroy();
+  cropper = null;
+}
+
+/* ===== 取引先履歴更新 ===== */
+function updateVendorHistory() {
+  const tx = db.transaction("receipts", "readonly");
+  const store = tx.objectStore("receipts");
+  // 全件取得してJSでソート・抽出
+  store.getAll().onsuccess = e => {
+    const all = e.target.result;
+    // savedAtの降順（新しい順）
+    all.sort((a, b) => (new Date(a.savedAt) < new Date(b.savedAt) ? 1 : -1));
+
+    const history = [];
+    const seen = new Set();
+    for (const r of all) {
+      if (r.vendor && !seen.has(r.vendor)) {
+        seen.add(r.vendor);
+        history.push(r.vendor);
+        if (history.length >= historyLimit) break; // 設定件数を表示
+      }
+    }
+
+    const container = document.getElementById("vendorHistory");
+    container.innerHTML = "";
+    if (history.length > 0) {
+      container.textContent = "取引先: ";
+      history.forEach(v => {
+        const span = document.createElement("span");
+        span.textContent = v;
+        span.style.cssText = "display:inline-block; margin-right:8px; cursor:pointer; text-decoration:underline; color:blue;";
+        span.onclick = () => { vendor.value = v; };
+        container.appendChild(span);
+      });
+    }
+  };
+}
+
+/* ===== 内容履歴更新 ===== */
+function updateDescHistory() {
+  const tx = db.transaction("receipts", "readonly");
+  const store = tx.objectStore("receipts");
+  store.getAll().onsuccess = e => {
+    const all = e.target.result;
+    all.sort((a, b) => (new Date(a.savedAt) < new Date(b.savedAt) ? 1 : -1));
+
+    const history = [];
+    const seen = new Set();
+    for (const r of all) {
+      if (r.description && !seen.has(r.description)) {
+        seen.add(r.description);
+        history.push(r.description);
+        if (history.length >= historyLimit) break;
+      }
+    }
+
+    const container = document.getElementById("descHistory");
+    container.innerHTML = "";
+    if (history.length > 0) {
+      container.textContent = "内容履歴: ";
+      history.forEach(v => {
+        const span = document.createElement("span");
+        span.textContent = v;
+        span.style.cssText = "display:inline-block; margin-right:8px; cursor:pointer; text-decoration:underline; color:blue;";
+        span.onclick = () => { description.value = v; };
+        container.appendChild(span);
+      });
+    }
+  };
+}
+
+/* ===== 登録 ===== */
+async function save() {
+  const f = file.files[0];
+  if (!date.value) return alert("日付を入力してください");
+  if (!amount.value) return alert("金額を入力してください");
+  if (!vendor.value) return alert("取引先を入力してください");
+  if (!f) return alert("ファイルを選択してください");
+  if (currentYear !== CURRENT_YEAR && isPastLocked) return alert("過去の年度はロックされています");
+
+  const buf = await f.arrayBuffer();
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  const hashHex = [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2,"0")).join("");
+
+  const tx = db.transaction("receipts", "readwrite");
+  tx.objectStore("receipts").add({
+    id: crypto.randomUUID(),
+    fiscalYear: currentYear,
+    date: date.value,
+    amount: Number(amount.value),
+    vendor: vendor.value,
+    description: description.value,
+    file: f,
+    hash: hashHex,
+    savedAt: new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }),
+    locked: true
+  });
+
+  alert("保存しました");
+  updateYearSummary();
+  clearForm();
+  updateVendorHistory();
+  updateDescHistory();
+}
+
+/* ===== 検索 ===== */
+function search() {
+  result.innerHTML = "";
+  const tx = db.transaction("receipts", "readonly");
+  const index = tx.objectStore("receipts").index("fiscalYear");
+  index.openCursor(IDBKeyRange.only(currentYear)).onsuccess = e => {
+    const c = e.target.result;
+    if (!c) return;
+    const r = c.value;
+
+    if (
+      (!from.value || r.date >= from.value) &&
+      (!to.value || r.date <= to.value) &&
+      (!min.value || r.amount >= min.value) &&
+      (!max.value || r.amount <= max.value) &&
+      (!vendorSearch.value || r.vendor.includes(vendorSearch.value)) &&
+      (!descSearch.value || (r.description && r.description.includes(descSearch.value)))
+    ) {
+      const tr = document.createElement("tr");
+      const savedAtStr = r.savedAt.includes("T") ? new Date(r.savedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : r.savedAt;
+      [r.date, r.amount, r.vendor, r.description || "", savedAtStr].forEach(text => {
+        const td = document.createElement("td");
+        td.textContent = text;
+        tr.appendChild(td);
+      });
+
+      const tdImg = document.createElement("td");
+      if (r.file) {
+        const url = URL.createObjectURL(r.file);
+        const a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        const img = document.createElement("img");
+        img.src = url;
+        img.style.maxWidth = "80px";
+        img.style.maxHeight = "80px";
+        a.appendChild(img);
+        tdImg.appendChild(a);
+      }
+      tr.appendChild(tdImg);
+
+      const tdOp = document.createElement("td");
+      if (r.deletedAt) {
+        tdOp.innerHTML = `<span style="color:red; font-weight:bold;">削除済み</span><br><span style="font-size:0.8em; color:red;">${r.deletedAt}</span>`;
+        tr.style.backgroundColor = "#fff0f0";
+      } else {
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "削除";
+        delBtn.onclick = () => deleteReceipt(r.id);
+        tdOp.appendChild(delBtn);
+      }
+      tr.appendChild(tdOp);
+      result.appendChild(tr);
+    }
+    c.continue();
+  };
+}
+
+/* ===== 検索クリア ===== */
+function clearSearch() {
+  from.value = "";
+  to.value = "";
+  min.value = "";
+  max.value = "";
+  vendorSearch.value = "";
+  descSearch.value = "";
+  result.innerHTML = "";
+}
+
+/* ===== 削除処理 ===== */
+function deleteReceipt(id) {
+  if (!confirm("本当に削除しますか？\n※削除履歴が残ります")) return;
+  
+  const tx = db.transaction("receipts", "readwrite");
+  const store = tx.objectStore("receipts");
+  const req = store.get(id);
+  
+  req.onsuccess = () => {
+    const data = req.result;
+    if (data) {
+      if (isPastLocked && data.fiscalYear !== CURRENT_YEAR) {
+        alert("過去の年度はロックされています。\n削除するには保守画面でロックを解除してください。");
+        tx.abort(); // トランザクション中止
+        return;
+      }
+      data.deletedAt = new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }); // 削除日時を記録(JST)
+      store.put(data);
+      alert("削除しました");
+      search();
+      updateYearSummary();
+    }
+  };
+  // tx.oncompleteでのalertは削除し、onsuccess内で処理完了後に実行
+}
+
+/* ===== 年度別合計 ===== */
+function updateYearSummary() {
+  let total = 0;
+  const tx = db.transaction("receipts", "readonly");
+  tx.objectStore("receipts").openCursor().onsuccess = e => {
+    const c = e.target.result;
+    if (!c) {
+      yearSummary.textContent =
+        `${currentYear}年度 合計金額：¥${total.toLocaleString()}`;
+      return;
+    }
+    if (c.value.fiscalYear === currentYear && !c.value.deletedAt) total += c.value.amount;
+    c.continue();
+  };
+}
+
+/* ===== 自動バックアップ ===== */
+function backupYear(year) {
+  const rows = [["年度","日付","金額","取引先","内容","保存日時","ハッシュ"]];
+  const json = [];
+
+  const tx = db.transaction("receipts","readonly");
+  tx.objectStore("receipts").openCursor().onsuccess = e => {
+    const c = e.target.result;
+    if (!c) {
+      let filename = `${backupPrefix}_backup_${year}`;
+      if (isBackupDate) filename += "_" + getYYYYMMDD();
+      download(new Blob([rows.map(r=>r.join(",")).join("\n")],{type:"text/csv"}),
+               filename + ".csv");
+      download(new Blob([JSON.stringify(json,null,2)],{type:"application/json"}),
+               filename + ".json");
+      return;
+    }
+    if (c.value.fiscalYear === year) {
+      rows.push([c.value.fiscalYear,c.value.date,c.value.amount,c.value.vendor,c.value.description||"",c.value.savedAt,c.value.hash]);
+      json.push(c.value);
+    }
+    c.continue();
+  };
+}
+
+/* ===== インポート機能 ===== */
+async function importData() {
+  const fileInput = document.getElementById("importFile");
+  const file = fileInput.files[0];
+  if (!file) return alert("ファイル(JSON)を選択してください");
+
+  if (!confirm("現在のデータに上書き・追加されます。\nよろしいですか？")) return;
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    if (!Array.isArray(data)) throw new Error("データ形式が正しくありません");
+
+    const tx = db.transaction("receipts", "readwrite");
+    const store = tx.objectStore("receipts");
+    
+    let count = 0;
+    for (const item of data) {
+      // JSON化でFileオブジェクトは失われるため、空オブジェクト等は削除してエラー回避
+      if (item.file && !(item.file instanceof Blob)) delete item.file;
+      store.put(item);
+      count++;
+    }
+
+    tx.oncomplete = () => {
+      alert(`${count}件のデータを復元しました。\n画面をリロードします。`);
+      location.reload();
+    };
+    tx.onerror = (e) => alert("保存エラー: " + e.target.error);
+  } catch (err) {
+    alert("インポート失敗: " + err.message);
+  }
+}
+
+/* ===== 全データ初期化 ===== */
+function showResetUI() {
+  document.getElementById("resetUI").style.display = "block";
+  document.getElementById("initBtn").disabled = true;
+}
+
+function hideResetUI() {
+  document.getElementById("resetUI").style.display = "none";
+  document.getElementById("initBtn").disabled = false;
+  document.getElementById("resetConfirmInput").value = "";
+}
+
+async function executeReset() {
+  const input = document.getElementById("resetConfirmInput").value;
+  if (!input || input !== "初期化") {
+    alert("承認ワードが正しくありません");
+    return;
+  }
+  
+  // 全データバックアップ
+  await backupAll();
+
+  // 削除処理
+  const tx = db.transaction("receipts", "readwrite");
+  tx.objectStore("receipts").clear();
+  tx.oncomplete = () => {
+    alert("全データを削除しました。システムをリロードします。");
+    location.reload();
+  };
+}
+
+function backupAll() {
+  return new Promise((resolve) => {
+    const rows = [["年度","日付","金額","取引先","内容","保存日時","ハッシュ","削除日時"]];
+    const json = [];
+    const tx = db.transaction("receipts","readonly");
+    tx.objectStore("receipts").openCursor().onsuccess = e => {
+      const c = e.target.result;
+      if (!c) {
+        let filename = `${backupPrefix}_backup_ALL`;
+        if (isBackupDate) {
+          filename += "_" + getYYYYMMDD();
+        } else {
+          filename += "_" + Date.now();
+        }
+        download(new Blob([rows.map(r=>r.join(",")).join("\n")],{type:"text/csv"}), filename + ".csv");
+        download(new Blob([JSON.stringify(json,null,2)],{type:"application/json"}), filename + ".json");
+        resolve();
+        return;
+      }
+      const v = c.value;
+      rows.push([v.fiscalYear,v.date,v.amount,v.vendor,v.description||"",v.savedAt,v.hash,v.deletedAt||""]);
+      json.push(v);
+      c.continue();
+    };
+  });
+}
+
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+}
+</script>
+
+</div><!-- /container -->
+
+</body>
+</html>
