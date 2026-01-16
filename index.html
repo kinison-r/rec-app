@@ -1507,6 +1507,7 @@ function r() {
         let h = `<div style="margin-bottom: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
         h += `<label style="font-size:10px; color:#888;">履歴から除外:</label>`;
         h += `<div style="display:flex; overflow-x:auto; gap:5px; margin-top:5px; padding-bottom:5px; -webkit-overflow-scrolling: touch; max-width:100%;">`;
+        const historyCount = st.settings.searchHistoryCount || 5;
         notHistory.slice(0, historyCount).forEach(item => {
           h += `<button class="btn-sub" style="background:#ffecec; color:#dc3545; white-space:nowrap;" onclick="setSearchNotKeyword('${esc(item.text)}')">${esc(item.text)}</button>`;
         });
