@@ -839,6 +839,14 @@
       </details>
 
       <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
+        <summary style="font-weight:bold; cursor:pointer;">検索設定</summary>
+        <div class="mt-2">
+          <label for="search-history-count-slider">検索履歴の表示件数: <span id="search-history-count-value">5</span>件</label>
+          <input type="range" id="search-history-count-slider" min="1" max="20" step="1" value="5" oninput="updateSearchSetting('searchHistoryCount', this.value)">
+        </div>
+      </details>
+
+      <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
         <summary style="font-weight:bold; cursor:pointer;">ストレージ情報 (容量・永続化)</summary>
         <div id="storage-stats" class="mt-2" style="font-size:13px; line-height:1.6;">
           <button class="btn-sub" onclick="checkStorage()">情報を取得・更新</button>
@@ -1029,7 +1037,7 @@ function getDeviceType() {
 }
 // ▲▲▲ 追加 ▲▲▲
 
-let st = { cats: [], stock: [], cur: null, view: 'input', editR: null, editF: null, editCat: null, form: {}, ioLogs: [], debugLogs: [], extFiles: [], extCurrentIdx: -1, extData: [], extFileName: null, extFileDate: null, settings: { realtimeBackup: false, graphHeight: 360, graphLineColor: '#007bff', graphLineWidth: 3, graphMaLineColor: '#ff9800', graphMaLineWidth: 3, graphLatestLineColor: '#ff0000', graphLatestLineWidth: 1, graphDataFontSize: 10, graphAxisFontSize: 10, graphTitleFontSize: 14, graphMinLabelSpacing: 8, graphXAxisInterval: 'auto', waterTarget: 1500, imageMaxWidth: 800, imageQuality: 80, searchHistory: [], searchNotHistory: [], graphMarkerShow: true, graphMarkerSize: 4 }, extSelectedItems: [], extGraphMode: 0, analysisSelection: new Set() };
+let st = { cats: [], stock: [], cur: null, view: 'input', editR: null, editF: null, editCat: null, form: {}, ioLogs: [], debugLogs: [], extFiles: [], extCurrentIdx: -1, extData: [], extFileName: null, extFileDate: null, settings: { realtimeBackup: false, graphHeight: 360, graphLineColor: '#007bff', graphLineWidth: 3, graphMaLineColor: '#ff9800', graphMaLineWidth: 3, graphLatestLineColor: '#ff0000', graphLatestLineWidth: 1, graphDataFontSize: 10, graphAxisFontSize: 10, graphTitleFontSize: 14, graphMinLabelSpacing: 8, graphXAxisInterval: 'auto', waterTarget: 1500, imageMaxWidth: 800, imageQuality: 80, searchHistory: [], searchNotHistory: [], graphMarkerShow: true, graphMarkerSize: 4, searchHistoryCount: 5 }, extSelectedItems: [], extGraphMode: 0, analysisSelection: new Set() };
 const RECS_PER_PAGE = 20;
 let analysisRecordsCache = [];
 let backupCounter = 0;
@@ -1284,6 +1292,17 @@ function updateMealReportSettings(val) {
   st.settings.mealReportHeaderFields = val;
   saveSettings();
 }
+
+function updateSearchSetting(key, value) {
+  if (!st.settings) st.settings = {};
+  const numValue = parseInt(value, 10);
+  st.settings[key] = numValue;
+  if (key === 'searchHistoryCount') {
+    document.getElementById('search-history-count-value').innerText = numValue;
+    document.getElementById('search-history-count-slider').value = numValue;
+  }
+  saveSettings();
+}
 // ▲▲▲ 追加 ▲▲▲
 
 // ▼▼▼ 追加: リアルタイムバックアップ機能 ▼▼▼
@@ -1468,7 +1487,8 @@ function r() {
         let h = `<div style="margin-bottom: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
         h += `<label style="font-size:10px; color:#888;">履歴から入力:</label>`;
         h += `<div style="display:flex; overflow-x:auto; gap:5px; margin-top:5px; padding-bottom:5px; -webkit-overflow-scrolling: touch; max-width:100%;">`;
-        history.forEach(item => {
+        const historyCount = st.settings.searchHistoryCount || 5;
+        history.slice(0, historyCount).forEach(item => {
           h += `<button class="btn-sub" style="background:#e9ecef; color:#495057; white-space:nowrap;" onclick="setSearchKeyword('${esc(item.text)}')">${esc(item.text)}</button>`;
         });
         h += `</div></div>`;
@@ -1487,7 +1507,7 @@ function r() {
         let h = `<div style="margin-bottom: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
         h += `<label style="font-size:10px; color:#888;">履歴から除外:</label>`;
         h += `<div style="display:flex; overflow-x:auto; gap:5px; margin-top:5px; padding-bottom:5px; -webkit-overflow-scrolling: touch; max-width:100%;">`;
-        notHistory.forEach(item => {
+        notHistory.slice(0, historyCount).forEach(item => {
           h += `<button class="btn-sub" style="background:#ffecec; color:#dc3545; white-space:nowrap;" onclick="setSearchNotKeyword('${esc(item.text)}')">${esc(item.text)}</button>`;
         });
         h += `</div></div>`;
@@ -1611,6 +1631,12 @@ function r() {
       const q = st.settings.imageQuality || 80;
       imgQualitySlider.value = q;
       document.getElementById('img-quality-value').innerText = q;
+    }
+    const searchHistorySlider = document.getElementById('search-history-count-slider');
+    if (searchHistorySlider) {
+      const count = (st.settings && st.settings.searchHistoryCount) || 5;
+      searchHistorySlider.value = count;
+      document.getElementById('search-history-count-value').innerText = count;
     }
   }
   if (st.view === 'analysis') {
@@ -6144,7 +6170,7 @@ async function resetApp() {
     } catch(e) { console.error(e); }
   } else {
     st.cats = JSON.parse(JSON.stringify(DEFAULT_DATA));
-    st.settings = { realtimeBackup: false, graphHeight: 360, graphLineColor: '#007bff', graphLineWidth: 3, graphMaLineColor: '#ff9800', graphMaLineWidth: 3, graphLatestLineColor: '#ff0000', graphLatestLineWidth: 1, graphDataFontSize: 10, graphAxisFontSize: 10, graphTitleFontSize: 14, graphMinLabelSpacing: 8, graphXAxisInterval: 'auto', waterTarget: 1500, imageMaxWidth: 800, imageQuality: 80, graphMarkerShow: true, graphMarkerSize: 4, searchHistory: [], searchNotHistory: [] };
+    st.settings = { realtimeBackup: false, graphHeight: 360, graphLineColor: '#007bff', graphLineWidth: 3, graphMaLineColor: '#ff9800', graphMaLineWidth: 3, graphLatestLineColor: '#ff0000', graphLatestLineWidth: 1, graphDataFontSize: 10, graphAxisFontSize: 10, graphTitleFontSize: 14, graphMinLabelSpacing: 8, graphXAxisInterval: 'auto', waterTarget: 1500, imageMaxWidth: 800, imageQuality: 80, graphMarkerShow: true, graphMarkerSize: 4, searchHistory: [], searchNotHistory: [], searchHistoryCount: 5 };
     save();
     saveSettings();
   }
