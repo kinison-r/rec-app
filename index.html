@@ -1769,7 +1769,8 @@ function rIn(c) {
             h += `<label style="font-size:10px; color:#888;">候補をクリックして入力 (最近使った順):</label>`;
             h += `<div style="display:flex; overflow-x:auto; gap:5px; margin-top:5px; padding-bottom:5px; -webkit-overflow-scrolling: touch;">`;
             // f.optionsはオブジェクトの配列 {text, ts}
-            (f.options || []).forEach(optObj => {
+            const historyCount = st.settings.searchHistoryCount || 5;
+            (f.options || []).slice(0, historyCount).forEach(optObj => {
                 h += `<button class="btn-sub" style="background:#e9ecef; color:#495057; white-space:nowrap;" onclick="addTextFromOption('${f.id}', '${esc(optObj.text)}')">${esc(optObj.text)}</button>`;
             });
             h += `</div></div>`;
