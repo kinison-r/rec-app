@@ -1906,8 +1906,20 @@ function captureFormValues() {
 // ★追加: 候補からのテキスト入力
 function addTextFromOption(fieldId, optionText) {
     const box = document.getElementById(`box-${fieldId}`);
+    const currentInputs = Array.from(box.querySelectorAll(`.multi-${fieldId}`));
+
+    // 既に選択されている場合は解除（削除）
+    const existing = currentInputs.find(input => input.value === optionText);
+    if (existing) {
+        existing.parentElement.remove();
+        if (box.querySelectorAll(`.multi-${fieldId}`).length === 0) {
+            addMultiInput(`box-${fieldId}`, fieldId);
+        }
+        return;
+    }
+
     // 最初の空の入力欄を探す
-    let emptyInput = Array.from(box.querySelectorAll(`.multi-${fieldId}`)).find(input => input.value.trim() === '');
+    let emptyInput = currentInputs.find(input => input.value.trim() === '');
 
     if (emptyInput) {
         emptyInput.value = optionText;
@@ -1915,8 +1927,8 @@ function addTextFromOption(fieldId, optionText) {
     } else {
         // 空の入力欄がなければ、新しいものを追加して入力
         addMultiInput(`box-${fieldId}`, fieldId);
-        const allInputs = box.querySelectorAll(`.multi-${fieldId}`);
-        const newInput = allInputs[allInputs.length - 1];
+        const newInputs = box.querySelectorAll(`.multi-${fieldId}`);
+        const newInput = newInputs[newInputs.length - 1];
         if (newInput) {
             newInput.value = optionText;
             newInput.dispatchEvent(new Event('change', {bubbles: true}));
@@ -7372,20 +7384,26 @@ function startCatVoiceInput() {
 // ▼▼▼ 追加: 選択肢展開・フォーカス制御 ▼▼▼
 function selectOption(fid, val, btn) {
   const input = document.getElementById('i-' + fid);
+  let isDeselect = false;
   if (input) {
-      input.value = val;
+      if (input.value === val) {
+          input.value = '';
+          isDeselect = true;
+      } else {
+          input.value = val;
+      }
       input.dispatchEvent(new Event('change', {bubbles: true}));
       input.dispatchEvent(new Event('input', {bubbles: true}));
   }
   const grp = document.getElementById('sel-grp-' + fid);
   if (grp) {
     grp.querySelectorAll('.option-btn').forEach(b => {
-      const isSel = (b === btn);
+      const isSel = (!isDeselect && b === btn);
       b.style.background = isSel ? '#007bff' : '#fff';
       b.style.color = isSel ? '#fff' : '#333';
     });
   }
-  moveFocusToNext(btn);
+  if (!isDeselect) moveFocusToNext(btn);
 }
 
 function focusFirstInput() {
