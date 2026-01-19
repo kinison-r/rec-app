@@ -706,11 +706,11 @@
           <div style="margin-bottom:15px; padding:10px; background:#e7f1ff; border-radius:5px; border:1px solid #b6d4fe;">
              <div style="font-size:12px; font-weight:bold; margin-bottom:5px; color:#0056b3;">共通保存先フォルダ (CSV/JSON/バックアップ)</div>
              <div id="save-dir-status" style="font-size:11px; color:#333; margin-bottom:5px; font-weight:bold;">未設定</div>
-             <div class="d-flex gap-1">
+             <div id="save-dir-btns" class="d-flex gap-1">
                <button class="btn-sub" style="background:#007bff;" onclick="setupSaveDirectory()">保存先フォルダを選択</button>
                <button class="btn-sub" style="background:#6c757d;" onclick="clearSaveDirectory()">設定解除</button>
              </div>
-             <p style="font-size:10px; color:#666; margin-top:5px;">
+             <p id="save-dir-desc" style="font-size:10px; color:#666; margin-top:5px;">
                ※設定すると、すべてのファイル出力がこのフォルダに行われます。<br>
                ※自動バックアップは固定名で上書き、手動出力は日時名で保存されます。
              </p>
@@ -1346,11 +1346,20 @@ async function realtimeBackup() {
 
 async function updateSaveDirectoryStatus() {
   const el = document.getElementById('save-dir-status');
+  const btnArea = document.getElementById('save-dir-btns');
+  const desc = document.getElementById('save-dir-desc');
   if (!el) return;
+
   if (!window.showDirectoryPicker) {
-    el.innerHTML = '<span style="color:#dc3545;">このブラウザは対応していません</span>';
+    el.innerHTML = '<span style="color:#dc3545; font-weight:bold;">この端末(Android等)はフォルダ指定未対応です</span>';
+    if(btnArea) btnArea.style.display = 'none';
+    if(desc) desc.innerHTML = '※Android等のモバイル端末では、セキュリティ制限によりフォルダの固定ができません。<br>※ファイルは<b>「ダウンロード」</b>フォルダ等に保存されます。<br>※Googleドライブへ保存したい場合は、保存後にファイル管理アプリ等で移動するか、Googleドライブアプリからアップロードしてください。';
     return;
   }
+  
+  if(btnArea) btnArea.style.display = 'flex';
+  if(desc) desc.innerHTML = '※設定すると、すべてのファイル出力がこのフォルダに行われます。<br>※自動バックアップは固定名で上書き、手動出力は日時名で保存されます。';
+
   try {
     if (!saveDirHandle) saveDirHandle = await idb.get('save_dir_handle');
     if (saveDirHandle) el.innerHTML = '<span style="color:#28a745; font-weight:bold;">設定済み</span> (' + (saveDirHandle.name || 'フォルダ') + ')';
