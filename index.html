@@ -700,40 +700,58 @@
       </details>
 
       <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
-        <summary style="font-weight:bold; cursor:pointer;">データ入出力 (CSV/JSON)</summary>
-        <div class="d-flex gap-1 mt-2" style="flex-wrap:wrap;">
-          <select id="csv-sel" class="flex-2" style="margin:0; font-size:14px; min-width:120px;"></select>
-          <button class="btn-main flex-1" style="margin:0; background:#007bff; padding:10px; font-size:14px; min-width:60px;" onclick="expCSV()">CSV</button>
-          <button class="btn-main flex-1" style="margin:0; background:#6610f2; padding:10px; font-size:14px; min-width:80px;" onclick="expCSVSplit()">CSV(分割)</button>
-          <button class="btn-main flex-1" style="margin:0; background:#17a2b8; padding:10px; font-size:14px; min-width:60px;" onclick="expJSON()">JSON</button>
-        </div>
-        <button class="btn-main mt-2" style="background:#6f42c1;" onclick="expImages()">ファイル一括出力 (ZIP)</button>
-        <div class="mt-2 p-2 bg-light-gray border d-flex align-center gap-2" style="border-radius:5px;">
-          <span style="font-size:12px; font-weight:bold; color:#555;">取込モード:</span>
-          <label style="font-size:13px; cursor:pointer;"><input type="radio" name="json-import-mode" value="overwrite" checked> 上書き</label>
-          <label style="font-size:13px; cursor:pointer;"><input type="radio" name="json-import-mode" value="merge"> 追加(マージ)</label>
-        </div>
-        <button class="btn-main" style="background:#dc3545; margin-top:10px;" onclick="document.getElementById('file-ptr').click()">＋ JSONファイル取込</button>
-        <input type="file" id="file-ptr" accept=".json" style="display:none;" onchange="importJSON(this)">
-        <div style="margin-top:15px; border-top:1px dashed #ddd; padding-top:5px;">
-          <div style="font-size:12px; font-weight:bold; color:#666; margin-bottom:5px;">入出力履歴 (過去48時間)</div>
-          <div id="io-logs" style="max-height:150px; overflow-y:auto;"></div>
-        </div>
-      </details>
-
-      <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
-        <summary style="font-weight:bold; cursor:pointer;">自動バックアップ設定</summary>
+        <summary style="font-weight:bold; cursor:pointer;">データ管理 (入出力・バックアップ)</summary>
+        
         <div class="mt-2">
-          <label style="display:flex; align-items:center; font-size:14px;">
-            <input type="checkbox" id="realtime-backup-switch" onchange="toggleRealtimeBackup(this.checked)" style="width:auto; height:18px; width:18px; margin-right:10px;">
-            データ変更時に自動でバックアップファイルを作成する
-          </label>
-          <p style="font-size:11px; color:#666; margin-top:5px; padding-left:28px;">
-            注意: この機能をONにすると、記録の追加・編集・削除などを行うたびにファイル保存ダイアログが表示されます。
-          </p>
-          <div style="margin-top:10px; padding-left:28px;">
-             <label for="backup-freq-slider">実行頻度: <span id="backup-freq-value">1</span>回に1回</label>
-             <input type="range" id="backup-freq-slider" min="1" max="10" step="1" value="1" oninput="updateBackupFrequency(this.value)">
+          <div style="margin-bottom:15px; padding:10px; background:#e7f1ff; border-radius:5px; border:1px solid #b6d4fe;">
+             <div style="font-size:12px; font-weight:bold; margin-bottom:5px; color:#0056b3;">共通保存先フォルダ (CSV/JSON/バックアップ)</div>
+             <div id="save-dir-status" style="font-size:11px; color:#333; margin-bottom:5px; font-weight:bold;">未設定</div>
+             <div class="d-flex gap-1">
+               <button class="btn-sub" style="background:#007bff;" onclick="setupSaveDirectory()">保存先フォルダを選択</button>
+               <button class="btn-sub" style="background:#6c757d;" onclick="clearSaveDirectory()">設定解除</button>
+             </div>
+             <p style="font-size:10px; color:#666; margin-top:5px;">
+               ※設定すると、すべてのファイル出力がこのフォルダに行われます。<br>
+               ※自動バックアップは固定名で上書き、手動出力は日時名で保存されます。
+             </p>
+          </div>
+
+          <h3 style="font-size:13px; margin-bottom:5px; border-bottom:1px solid #eee;">手動入出力</h3>
+          <div class="d-flex gap-1 mt-2" style="flex-wrap:wrap;">
+            <select id="csv-sel" class="flex-2" style="margin:0; font-size:14px; min-width:120px;"></select>
+            <button class="btn-main flex-1" style="margin:0; background:#007bff; padding:10px; font-size:14px; min-width:60px;" onclick="expCSV()">CSV</button>
+            <button class="btn-main flex-1" style="margin:0; background:#6610f2; padding:10px; font-size:14px; min-width:80px;" onclick="expCSVSplit()">CSV(分割)</button>
+            <button class="btn-main flex-1" style="margin:0; background:#17a2b8; padding:10px; font-size:14px; min-width:60px;" onclick="expJSON()">JSON</button>
+          </div>
+          <button class="btn-main mt-2" style="background:#6f42c1;" onclick="expImages()">ファイル一括出力 (ZIP)</button>
+          <div class="mt-2 p-2 bg-light-gray border d-flex align-center gap-2" style="border-radius:5px;">
+            <span style="font-size:12px; font-weight:bold; color:#555;">取込モード:</span>
+            <label style="font-size:13px; cursor:pointer;"><input type="radio" name="json-import-mode" value="overwrite" checked> 上書き</label>
+            <label style="font-size:13px; cursor:pointer;"><input type="radio" name="json-import-mode" value="merge"> 追加(マージ)</label>
+          </div>
+          <button class="btn-main" style="background:#dc3545; margin-top:10px;" onclick="document.getElementById('file-ptr').click()">＋ JSONファイル取込</button>
+          <input type="file" id="file-ptr" accept=".json" style="display:none;" onchange="importJSON(this)">
+          
+          <div style="margin-top:15px; border-top:1px dashed #ddd; padding-top:5px;">
+            <div style="font-size:12px; font-weight:bold; color:#666; margin-bottom:5px;">入出力履歴 (過去48時間)</div>
+            <div id="io-logs" style="max-height:150px; overflow-y:auto;"></div>
+          </div>
+        </div>
+
+        <div class="mt-2" style="margin-top:20px; border-top:2px solid #eee; padding-top:10px;">
+          <h3 style="font-size:13px; margin-bottom:5px; border-bottom:1px solid #eee;">自動バックアップ設定</h3>
+          <div class="mt-2">
+            <label style="display:flex; align-items:center; font-size:14px;">
+              <input type="checkbox" id="realtime-backup-switch" onchange="toggleRealtimeBackup(this.checked)" style="width:auto; height:18px; width:18px; margin-right:10px;">
+              データ変更時に自動でバックアップファイルを作成する
+            </label>
+            <p style="font-size:11px; color:#666; margin-top:5px; padding-left:28px;">
+              注意: この機能をONにすると、記録の追加・編集・削除などを行うたびにファイル保存ダイアログが表示されます。
+            </p>
+            <div style="margin-top:10px; padding-left:28px;">
+               <label for="backup-freq-slider">実行頻度: <span id="backup-freq-value">1</span>回に1回</label>
+               <input type="range" id="backup-freq-slider" min="1" max="10" step="1" value="1" oninput="updateBackupFrequency(this.value)">
+            </div>
           </div>
         </div>
       </details>
@@ -1306,7 +1324,7 @@ function updateSearchSetting(key, value) {
 // ▲▲▲ 追加 ▲▲▲
 
 // ▼▼▼ 追加: リアルタイムバックアップ機能 ▼▼▼
-let backupHandle = null;
+let saveDirHandle = null;
 
 async function realtimeBackup() {
   const data = {
@@ -1321,33 +1339,43 @@ async function realtimeBackup() {
   const blob = new Blob([jsonStr], {type:'application/json'});
   const filename = '行動ログ６１０リアルバックアップ.json';
 
-  if (window.showSaveFilePicker) {
-    try {
-      if (!backupHandle) {
-        try { backupHandle = await idb.get('backup_handle'); } catch(e){}
-      }
-      if (backupHandle) {
-        const opts = { mode: 'readwrite' };
-        if ((await backupHandle.queryPermission(opts)) !== 'granted') {
-           if ((await backupHandle.requestPermission(opts)) !== 'granted') backupHandle = null;
-        }
-      }
-      if (!backupHandle) {
-        backupHandle = await window.showSaveFilePicker({ suggestedName: filename, types: [{ description: 'JSON Backup', accept: { 'application/json': ['.json'] } }] });
-        await idb.set('backup_handle', backupHandle);
-      }
-      const writable = await backupHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      showToast('自動バックアップを保存しました');
-      return;
-    } catch (e) {
-      if (e.name === 'AbortError') return;
-      console.error('Backup error:', e);
-      backupHandle = null;
-    }
-  }
+  // saveBlobに任せる（ディレクトリ設定があればそこに上書きされる）
   await saveBlob(blob, filename);
+  if (saveDirHandle) showToast('自動バックアップを保存しました');
+}
+
+async function updateSaveDirectoryStatus() {
+  const el = document.getElementById('save-dir-status');
+  if (!el) return;
+  if (!window.showDirectoryPicker) {
+    el.innerHTML = '<span style="color:#dc3545;">このブラウザは対応していません</span>';
+    return;
+  }
+  try {
+    if (!saveDirHandle) saveDirHandle = await idb.get('save_dir_handle');
+    if (saveDirHandle) el.innerHTML = '<span style="color:#28a745; font-weight:bold;">設定済み</span> (' + (saveDirHandle.name || 'フォルダ') + ')';
+    else el.innerHTML = '<span style="color:#666;">未設定 (毎回ダイアログ表示/ダウンロード)</span>';
+  } catch(e) { el.innerText = '状態確認エラー'; }
+}
+
+async function setupSaveDirectory() {
+  if (!window.showDirectoryPicker) { alert('このブラウザは対応していません。'); return; }
+  try {
+    const handle = await window.showDirectoryPicker();
+    if (handle) { 
+      saveDirHandle = handle; 
+      await idb.set('save_dir_handle', handle); 
+      updateSaveDirectoryStatus(); 
+      alert('保存先フォルダを設定しました。\n次回からCSV/JSON/バックアップは全てこのフォルダに保存されます。'); 
+    }
+  } catch (e) { if (e.name !== 'AbortError') alert('設定エラー: ' + e.message); }
+}
+
+async function clearSaveDirectory() {
+  saveDirHandle = null;
+  await idb.set('save_dir_handle', null);
+  updateSaveDirectoryStatus();
+  alert('保存先設定を解除しました。');
 }
 // ▲▲▲ 追加 ▲▲▲
 
@@ -1525,6 +1553,7 @@ function r() {
     if (c) rField(c);
     renderCatIconPalette(); // アイコンパレット初期化
     renderIoLogs();
+    updateSaveDirectoryStatus();
     const backupSwitch = document.getElementById('realtime-backup-switch');
     if (backupSwitch) {
       backupSwitch.checked = !!(st.settings && st.settings.realtimeBackup);
@@ -3407,7 +3436,7 @@ async function expStockCSV() {
   const blob = new Blob([txt], {type:'text/csv'});
   const ts = getTS();
   const name = `${VERSION}_${ts}_stock_list.csv`;
-  if(await saveBlob(blob, name)) addIoLog('export', name, true);
+  if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 // ▲▲▲ 追加 ▲▲▲
 
@@ -3578,6 +3607,32 @@ function setSearchNotKeyword(text) {
 // ファイル保存ヘルパー（File System Access API対応）
 async function saveBlob(blob, name) {
   try {
+    // 1. 共通保存先フォルダが設定されている場合
+    if (saveDirHandle) {
+      const opts = { mode: 'readwrite' };
+      // 権限確認
+      if ((await saveDirHandle.queryPermission(opts)) !== 'granted') {
+         if ((await saveDirHandle.requestPermission(opts)) !== 'granted') {
+             // 権限拒否された場合はフォールバックへ
+         } else {
+             // 権限取得成功
+             const fileHandle = await saveDirHandle.getFileHandle(name, { create: true });
+             const writable = await fileHandle.createWritable();
+             await writable.write(blob);
+             await writable.close();
+             return true;
+         }
+      } else {
+         // 権限あり
+         const fileHandle = await saveDirHandle.getFileHandle(name, { create: true });
+         const writable = await fileHandle.createWritable();
+         await writable.write(blob);
+         await writable.close();
+         return true;
+      }
+    }
+
+    // 2. 従来の方法 (showSaveFilePicker)
     if(window.showSaveFilePicker) {
       const h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'File', accept: { [blob.type]: ['.'+name.split('.').pop()] } }] });
       const w = await h.createWritable(); await w.write(blob); await w.close(); return true;
@@ -3600,7 +3655,7 @@ async function expCSV() {
   const blob = new Blob([txt], {type:'text/csv'});
   const ts = getTS();
   const name = mode === 'all' ? `${VERSION}_${ts}_move_all.csv` : `${VERSION}_${ts}_action_${st.cats.find(x=>x.id===mode).name}.csv`;
-  if(await saveBlob(blob, name)) addIoLog('export', name, true);
+  if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 async function expCSVSplit() {
   const mode = document.getElementById('csv-sel').value;
@@ -3635,7 +3690,7 @@ async function expCSVSplit() {
   const ts = getTS();
   const catName = mode === 'all' ? 'all' : st.cats.find(x=>x.id===mode).name;
   const name = `${VERSION}_${ts}_split_${catName}.csv`;
-  if(await saveBlob(blob, name)) addIoLog('export', name, true);
+  if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 async function expJSON() {
   const mode = document.getElementById('csv-sel').value;
@@ -3655,7 +3710,7 @@ async function expJSON() {
   }
 
   const blob = new Blob([JSON.stringify(data, jsonJstReplacer, 2)], {type:'application/json'});
-  if(await saveBlob(blob, name)) addIoLog('export', name, true);
+  if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 async function expImages() {
   if (!window.JSZip) { alert('JSZipライブラリが読み込まれていません。'); return; }
@@ -3728,7 +3783,7 @@ async function expImages() {
     const blob = await zip.generateAsync({type:"blob"});
     const ts = getTS();
     const name = `${VERSION}_${ts}_files.zip`;
-    if(await saveBlob(blob, name)) addIoLog('export', name, true);
+    if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
   } catch(e) { console.error(e); alert('エラー: ' + e.message); }
   finally { document.body.style.cursor = 'default'; }
 }
@@ -5290,7 +5345,7 @@ async function exportAnalysisCSV() {
   const blob = new Blob([csv], {type:'text/csv'});
   const ts = getTS();
   const name = `${VERSION}_${ts}_analysis_export.csv`;
-  if(await saveBlob(blob, name)) addIoLog('export', name, true);
+  if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 
 function getRefRange(ref) {
