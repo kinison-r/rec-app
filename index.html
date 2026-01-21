@@ -2733,7 +2733,10 @@ function getStockData() {
   st.cats.forEach(c => {
     // ▼▼▼ 変更: 通院日フィールドの特定ロジック改良 ▼▼▼
     const normName = (f) => f.name.replace(/[\s　]+/g, '');
-    const candidates = c.fields.filter(f => normName(f).includes('通院日'));
+    const candidates = c.fields.filter(f => {
+        const n = normName(f);
+        return n.includes('通院日') || n.includes('受診日') || n.includes('予約日');
+    });
     
     let fNext = null;
     let fNextNext = null;
@@ -2761,7 +2764,7 @@ function getStockData() {
     // 医療機関名を特定するためのフィールドを探す
     const fHospital = c.fields.find(f => {
         const n = f.name.replace(/[\s　]+/g, '');
-        return n.includes('医療機関') || n.includes('病院名') || n.includes('クリニック') || n.includes('行先');
+        return n.includes('医療機関') || n.includes('病院') || n.includes('クリニック') || n.includes('行先') || n.includes('受診先') || n.includes('薬局');
     });
     
     if (fNext || fNextNext) {
