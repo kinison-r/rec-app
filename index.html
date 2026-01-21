@@ -2767,36 +2767,34 @@ function getStockData() {
         return n.includes('医療機関') || n.includes('病院') || n.includes('クリニック') || n.includes('行先') || n.includes('受診先') || n.includes('薬局');
     });
     
-    if (fNext || fNextNext) {
-      if (fHospital) {
-        // 医療機関名フィールドがある場合、その値ごとに最新のレコードを探す
-        const hospitalGroups = {};
-        // 次回通院日の日付順（近い順）にソート
-        let sorted = [];
-        if (fNext) {
-            sorted = c.records.filter(r => {
-                const d = r[fNext.id] ? new Date(r[fNext.id]) : null;
-                return d && !isNaN(d.getTime()) && d >= cutoffDate;
-            }).sort((a, b) => new Date(a[fNext.id]) - new Date(b[fNext.id]));
-        } else {
-            sorted = c.records.filter(r => getDt(r) >= cutoffDate).sort((a, b) => getDt(a) - getDt(b));
-        }
+    // ▼▼▼ 変更: 病院情報収集ロジックの改善 (通院日有無に関わらず収集) ▼▼▼
+    let sorted = [];
+    if (fNext) {
+        // 1. 未来の通院日があるレコードを優先
+        const futureRecs = c.records.filter(r => {
+            const d = r[fNext.id] ? new Date(r[fNext.id]) : null;
+            return d && !isNaN(d.getTime()) && d >= cutoffDate;
+        }).sort((a, b) => new Date(a[fNext.id]) - new Date(b[fNext.id]));
         
+        if (futureRecs.length > 0) sorted = futureRecs;
+        else sorted = c.records.slice().sort((a, b) => getDt(b) - getDt(a));
+    } else {
+        sorted = c.records.slice().sort((a, b) => getDt(b) - getDt(a));
+    }
+
+    if (fHospital) {
+        const hospitalGroups = {};
         sorted.forEach(rec => {
             const hName = rec[fHospital.id];
-            if (hName) {
-                if (!hospitalGroups[hName]) hospitalGroups[hName] = { next: null, nextNext: null };
-                
-                // まだ値が見つかっていない場合のみ、このレコードの値を採用（直近順に探しているため）
-                if (!hospitalGroups[hName].next && fNext && rec[fNext.id]) {
-                    hospitalGroups[hName].next = rec[fNext.id];
-                }
-                if (!hospitalGroups[hName].nextNext && fNextNext && rec[fNextNext.id]) {
-                    hospitalGroups[hName].nextNext = rec[fNextNext.id];
-                }
+            if (hName && !hospitalGroups[hName]) {
+                let nextVal = fNext ? rec[fNext.id] : null;
+                if (nextVal && new Date(nextVal) < cutoffDate) nextVal = null;
+                hospitalGroups[hName] = {
+                    next: nextVal,
+                    nextNext: fNextNext ? rec[fNextNext.id] : null
+                };
             }
         });
-        
         Object.keys(hospitalGroups).forEach(hName => {
             const g = hospitalGroups[hName];
             hospitalMap[hName] = {
@@ -2804,31 +2802,16 @@ function getStockData() {
                 nextNext: g.nextNext ? new Date(g.nextNext) : null
             };
         });
-      } else {
-        // 医療機関名フィールドがない場合は、カテゴリー名をキーにして最新レコードのみ使用
-        let sorted = [];
-        if (fNext) {
-            sorted = c.records.filter(r => {
-                const d = r[fNext.id] ? new Date(r[fNext.id]) : null;
-                return d && !isNaN(d.getTime()) && d >= cutoffDate;
-            }).sort((a, b) => new Date(a[fNext.id]) - new Date(b[fNext.id]));
-        } else {
-            sorted = c.records.filter(r => getDt(r) >= cutoffDate).sort((a, b) => getDt(a) - getDt(b));
-        }
+    } else {
         if (sorted.length > 0) {
-            // 値が入っている最新のレコードを探す（必ずしも先頭とは限らない）
-            const rNext = fNext ? sorted.find(r => r[fNext.id]) : null;
-            const rNextNext = fNextNext ? sorted.find(r => r[fNextNext.id]) : null;
-            
-            const nextVal = rNext ? rNext[fNext.id] : null;
-            const nextNextVal = rNextNext ? rNextNext[fNextNext.id] : null;
-            
+            const rec = sorted[0];
+            let nextVal = fNext ? rec[fNext.id] : null;
+            if (nextVal && new Date(nextVal) < cutoffDate) nextVal = null;
             hospitalMap[c.name] = {
                 next: nextVal ? new Date(nextVal) : null,
-                nextNext: nextNextVal ? new Date(nextNextVal) : null
+                nextNext: fNextNext ? rec[fNextNext.id] : null
             };
         }
-      }
     }
   });
   // ▲▲▲ 追加 ▲▲▲
