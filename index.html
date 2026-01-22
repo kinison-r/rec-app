@@ -2726,6 +2726,23 @@ function getStockData() {
   if (st.settings.stockSortAsc === undefined) st.settings.stockSortAsc = true;
   if (!st.settings.stockPeriodMonths) st.settings.stockPeriodMonths = 3; // デフォルト3ヶ月
 
+  // ▼▼▼ 追加: 病院フィールド特定ヘルパー (複数候補取得) ▼▼▼
+  const getHospitalFields = (fields) => {
+    return fields.filter(f => {
+        const n = f.name.replace(/[\s　]+/g, '');
+        return n.includes('医療機関') || n.includes('病院') || n.includes('クリニック') || n.includes('行先') || n.includes('受診先') || n.includes('薬局');
+    }).sort((a, b) => {
+        const score = (name) => {
+            const n = name.replace(/[\s　]+/g, '');
+            if (n.includes('医療機関') || n.includes('病院') || n.includes('クリニック')) return 3;
+            if (n.includes('行先') || n.includes('受診先')) return 2;
+            return 1;
+        };
+        return score(b.name) - score(a.name);
+    });
+  };
+  // ▲▲▲ 追加 ▲▲▲
+
   // ▼▼▼ 追加: 通院日情報の収集 ▼▼▼
   const hospitalMap = {}; // { "病院名": { next: Date, nextNext: Date } }
   const cutoffDate = new Date();
@@ -2761,58 +2778,58 @@ function getStockData() {
     }
     // ▲▲▲ 変更 ▲▲▲
 
-    // 医療機関名を特定するためのフィールドを探す
-    const fHospital = c.fields.find(f => {
-        const n = f.name.replace(/[\s　]+/g, '');
-        return n.includes('医療機関') || n.includes('病院') || n.includes('クリニック') || n.includes('行先') || n.includes('受診先') || n.includes('薬局');
-    });
+    // 医療機関名を特定するためのフィールドを探す (複数候補)
+    const hospitalFields = getHospitalFields(c.fields);
     
-    // ▼▼▼ 変更: 病院情報収集ロジックの改善 (通院日有無に関わらず収集) ▼▼▼
-    let sorted = [];
-    if (fNext) {
-        // 1. 未来の通院日があるレコードを優先
-        const futureRecs = c.records.filter(r => {
-            const d = r[fNext.id] ? new Date(r[fNext.id]) : null;
-            return d && !isNaN(d.getTime()) && d >= cutoffDate;
-        }).sort((a, b) => new Date(a[fNext.id]) - new Date(b[fNext.id]));
-        
-        if (futureRecs.length > 0) sorted = futureRecs;
-        else sorted = c.records.slice().sort((a, b) => getDt(b) - getDt(a));
-    } else {
-        sorted = c.records.slice().sort((a, b) => getDt(b) - getDt(a));
-    }
+    const processDates = (rec) => {
+        let d1 = fNext ? rec[fNext.id] : null;
+        let d2 = fNextNext ? rec[fNextNext.id] : null;
+        let date1 = d1 ? new Date(d1) : null;
+        let date2 = d2 ? new Date(d2) : null;
+        let valid1 = date1 && !isNaN(date1.getTime()) && date1 >= cutoffDate;
+        let valid2 = date2 && !isNaN(date2.getTime()) && date2 >= cutoffDate;
+        let finalNext = null;
+        let finalNextNext = null;
+        if (valid1) {
+            finalNext = d1;
+            if (valid2 && date2 > date1) finalNextNext = d2;
+        } else if (valid2) {
+            finalNext = d2;
+            finalNextNext = null;
+        }
+        return { next: finalNext, nextNext: finalNextNext };
+    };
 
-    if (fHospital) {
-        const hospitalGroups = {};
-        sorted.forEach(rec => {
-            const hName = rec[fHospital.id];
-            if (hName && !hospitalGroups[hName]) {
-                let nextVal = fNext ? rec[fNext.id] : null;
-                if (nextVal && new Date(nextVal) < cutoffDate) nextVal = null;
-                hospitalGroups[hName] = {
-                    next: nextVal,
-                    nextNext: fNextNext ? rec[fNextNext.id] : null
-                };
+    // ▼▼▼ 変更: 病院情報収集ロジックの改善 (全レコード走査) ▼▼▼
+    const hospitalSchedule = {}; 
+
+    c.records.forEach(rec => {
+        let hNames = [];
+        if (hospitalFields.length > 0) {
+            hospitalFields.forEach(f => {
+                if (rec[f.id]) hNames.push(rec[f.id]);
+            });
+        } else {
+            hNames.push(c.name);
+        }
+
+        hNames.forEach(hName => {
+            const dates = processDates(rec);
+            if (dates.next) {
+                const nextDate = new Date(dates.next);
+                if (!hospitalSchedule[hName] || nextDate < hospitalSchedule[hName].next) {
+                    hospitalSchedule[hName] = {
+                        next: nextDate,
+                        nextNext: dates.nextNext ? new Date(dates.nextNext) : null
+                    };
+                }
             }
         });
-        Object.keys(hospitalGroups).forEach(hName => {
-            const g = hospitalGroups[hName];
-            hospitalMap[hName] = {
-                next: g.next ? new Date(g.next) : null,
-                nextNext: g.nextNext ? new Date(g.nextNext) : null
-            };
-        });
-    } else {
-        if (sorted.length > 0) {
-            const rec = sorted[0];
-            let nextVal = fNext ? rec[fNext.id] : null;
-            if (nextVal && new Date(nextVal) < cutoffDate) nextVal = null;
-            hospitalMap[c.name] = {
-                next: nextVal ? new Date(nextVal) : null,
-                nextNext: fNextNext ? rec[fNextNext.id] : null
-            };
-        }
-    }
+    });
+
+    Object.keys(hospitalSchedule).forEach(hName => {
+        hospitalMap[hName] = hospitalSchedule[hName];
+    });
   });
   // ▲▲▲ 追加 ▲▲▲
 
@@ -2851,6 +2868,7 @@ function getStockData() {
   st.cats.forEach(c => {
     const fDrug = c.fields.find(f => f.name === '薬剤');
     const fStock = c.fields.find(f => f.name === '帳簿在庫数');
+    const hospitalFields = getHospitalFields(c.fields);
     
     if (!fDrug || !fStock) return;
 
@@ -2897,7 +2915,8 @@ function getStockData() {
             catName: c.name,
             isManual: false,
             remarks: remarksMap[drugName] || '',
-            image: imagesMap[drugName] || null
+            image: imagesMap[drugName] || null,
+            sourceHospital: hospitalFields.reduce((acc, f) => acc || r[f.id], null) // 最初の有効な値を使用
           };
         }
       });
@@ -2921,7 +2940,29 @@ function getStockData() {
     // 適用欄に含まれる病院名を探す
     // スペースを無視してマッチング（表記揺れ対策）
     const normRemarks = (item.remarks || '').replace(/[\s　]+/g, '');
-    const hospitalName = Object.keys(hospitalMap).find(name => normRemarks.includes(name.replace(/[\s　]+/g, '')));
+    let hospitalName = Object.keys(hospitalMap).find(name => normRemarks.includes(name.replace(/[\s　]+/g, '')));
+    
+    // 病院名が適用欄にない場合のフォールバック
+    if (!hospitalName) {
+        // 1. 在庫更新元のレコードに病院名が記録されていればそれを使用
+        if (item.sourceHospital) {
+            if (hospitalMap[item.sourceHospital]) {
+                hospitalName = item.sourceHospital;
+            } else {
+                // 部分一致検索 (sourceHospital が mapKey に含まれる、またはその逆)
+                const normSource = item.sourceHospital.replace(/[\s　]+/g, '');
+                const fuzzyKey = Object.keys(hospitalMap).find(k => {
+                    const normK = k.replace(/[\s　]+/g, '');
+                    return normK && (normK.includes(normSource) || normSource.includes(normK));
+                });
+                if (fuzzyKey) hospitalName = fuzzyKey;
+            }
+        }
+        // 2. カテゴリ名が病院マップに存在する場合（病院フィールドがないカテゴリの場合など）
+        else if (item.catName && hospitalMap[item.catName]) {
+            hospitalName = item.catName;
+        }
+    }
     
     if (hospitalName) {
       item.matchedHospital = hospitalName;
