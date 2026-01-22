@@ -2712,7 +2712,7 @@ function estimateDailyDose(text) {
   const t = text.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
                 .replace(/[\s　]+/g, '');
   
-  // パターン: "X日Y回Z単位" (例: "14日1回1単位")
+  // パターン: "X日Y回Z単位" (例: "14日1回1単位") - ★優先度を上げて最初に判定
   const patternDays = t.match(/(\d+)日(\d+)回(\d+(\.\d+)?)[錠包個mgmL単位瓶]/);
   if (patternDays) {
     const days = parseFloat(patternDays[1]);
@@ -2740,7 +2740,7 @@ function estimateDailyDose(text) {
   const dailyMatch = t.match(/1日(\d+(\.\d+)?)[錠包個mgmL単位瓶]/);
   if (dailyMatch) return parseFloat(dailyMatch[1]);
   
-  // パターン3: "朝夕1錠" (2回), "毎食後1錠" (3回) などの慣用句
+  // パターン3: "朝夕1錠" (2回), "毎食後1錠" (3回) などの慣用句 - ★優先度を下げる
   if (t.match(/(朝夕|朝晩).*1[錠包個単位瓶]/)) return 2;
   if (t.match(/毎食.*1[錠包個単位瓶]/) || t.match(/朝昼夕.*1[錠包個単位瓶]/)) return 3;
 
@@ -2846,7 +2846,9 @@ function getStockData() {
             const dates = processDates(rec);
             if (dates.next) {
                 const nextDate = new Date(dates.next);
-                if (!hospitalSchedule[hName] || nextDate < hospitalSchedule[hName].next) {
+                const current = hospitalSchedule[hName];
+                // 日付がより近い、または同じ日付で次次回情報がある場合（情報量が多い方）を優先して更新
+                if (!current || nextDate < current.next || (nextDate.getTime() === current.next.getTime() && dates.nextNext)) {
                     hospitalSchedule[hName] = {
                         next: nextDate,
                         nextNext: dates.nextNext ? new Date(dates.nextNext) : null
@@ -2885,6 +2887,10 @@ function getStockData() {
         catName: '取込/手動',
         isManual: true, // 手動データフラグ
         remarks: item.remarks || '',
+        hospital: item.hospital || '', // 追加: 病院指定
+        dailyDoseInput: item.dailyDose, // 追加: 1日量指定
+        unit: item.unit || '', // 追加: 単位
+        prescribedDays: item.prescribedDays, // 追加: 処方日数
         image: item.image || null
       };
     });
@@ -2944,6 +2950,10 @@ function getStockData() {
             catName: c.name,
             isManual: false,
             remarks: remarksMap[drugName] || '',
+            hospital: (st.stock && st.stock.find(s => s.name === drugName)?.hospital) || '',
+            dailyDoseInput: (st.stock && st.stock.find(s => s.name === drugName)?.dailyDose),
+            unit: (st.stock && st.stock.find(s => s.name === drugName)?.unit) || '',
+            prescribedDays: (st.stock && st.stock.find(s => s.name === drugName)?.prescribedDays),
             image: imagesMap[drugName] || null,
             sourceHospital: hospitalFields.reduce((acc, f) => acc || r[f.id], null) // 最初の有効な値を使用
           };
@@ -2957,7 +2967,13 @@ function getStockData() {
 
   // ▼▼▼ 追加: 予定残薬数・次回処方数の計算 ▼▼▼
   items.forEach(item => {
-    item.dailyDose = estimateDailyDose(item.remarks);
+    // 1日量の決定 (手動入力 > コメントからの推定)
+    if (item.dailyDoseInput !== undefined && item.dailyDoseInput !== null && item.dailyDoseInput !== '') {
+        item.dailyDose = parseFloat(item.dailyDoseInput);
+    } else {
+        item.dailyDose = estimateDailyDose(item.remarks);
+    }
+
     item.estStock = null;
     item.nextPrescription = null;
     item.daysToNext = null;
@@ -2966,10 +2982,21 @@ function getStockData() {
     item.nextNextDate = null;
     item.daysNextToNext = null;
 
-    // 適用欄に含まれる病院名を探す
-    // スペースを無視してマッチング（表記揺れ対策）
-    const normRemarks = (item.remarks || '').replace(/[\s　]+/g, '');
-    let hospitalName = Object.keys(hospitalMap).find(name => normRemarks.includes(name.replace(/[\s　]+/g, '')));
+    let hospitalName = null;
+    
+    // 1. 手動指定された病院名があれば最優先
+    if (item.hospital && hospitalMap[item.hospital]) {
+        hospitalName = item.hospital;
+    } 
+    // 2. なければコメント(適用)欄から推測
+    else {
+        const normRemarks = (item.remarks || '').replace(/[\s　]+/g, '');
+        hospitalName = Object.keys(hospitalMap).find(name => {
+            const n = name.replace(/[\s　]+/g, '');
+            if (n.length < 2) return false;
+            return normRemarks.includes(n) || n.includes(normRemarks);
+        });
+    }
     
     // 病院名が適用欄にない場合のフォールバック
     if (!hospitalName) {
@@ -3058,6 +3085,21 @@ function rStock() {
   const sortKey = st.settings.stockSortKey;
   const sortAsc = st.settings.stockSortAsc;
 
+  // ▼▼▼ 追加: 医療機関リストの生成 (選択肢用) ▼▼▼
+  const hospitalCat = st.cats.find(c => c.name.includes('医療機関'));
+  let hospitalOptions = [];
+  if (hospitalCat) {
+    const destField = hospitalCat.fields.find(f => f.name.includes('行先'));
+    if (destField) {
+        // 履歴(options)とレコードの実績値をマージしてユニークにする
+        const opts = (destField.options || []).map(o => typeof o === 'string' ? o : o.text);
+        const recVals = hospitalCat.records.map(r => r[destField.id]).filter(v => v);
+        hospitalOptions = [...new Set([...opts, ...recVals])].sort();
+    }
+  }
+  const hospitalSelectOpts = `<option value="">(自動判定)</option>` + hospitalOptions.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join('');
+  // ▲▲▲ 追加 ▲▲▲
+
   const list = document.getElementById('list-stock');
   
   // ヘッダー部分（ソート・表示切替）
@@ -3125,6 +3167,9 @@ function rStock() {
     
     const safeName = esc(item.name.replace(/'/g, "\\'"));
     const camBoxId = `stock-cam-box-${index}`;
+    const dailyDoseVal = (item.dailyDoseInput !== undefined && item.dailyDoseInput !== null) ? item.dailyDoseInput : '';
+    const unitVal = item.unit || '';
+    const prescribedDaysVal = (item.prescribedDays !== undefined && item.prescribedDays !== null) ? item.prescribedDays : '';
     const imgHtml = item.image 
       ? `<div style="margin:8px 0; text-align:center; position:relative; background:#f9f9f9; border-radius:5px; padding:5px;">
            <img src="${item.image}" style="max-height:120px; max-width:100%; border-radius:4px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.2);" onclick="showImage('${item.image}')">
@@ -3157,10 +3202,33 @@ function rStock() {
       ${hospitalInfo}
       ${estInfo}
       ${imgHtml}
+      
+      <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #eee;">
+        <div style="display:flex; gap:5px; margin-bottom:5px; flex-wrap:wrap;">
+          <div style="flex:2; min-width:120px;">
+            <label style="font-size:10px; color:#666;">病院・診療科</label>
+            <select onchange="updateStockAttribute('${safeName}', 'hospital', this.value)" style="padding:6px; font-size:12px; margin:0;">${hospitalSelectOpts.replace(`value="${esc(item.hospital||'')}"`, `value="${esc(item.hospital||'')}" selected`)}</select>
+          </div>
+          <div style="flex:1; min-width:60px;">
+            <label style="font-size:10px; color:#666;">1日量</label>
+            <input type="number" step="0.01" placeholder="自動" value="${dailyDoseVal}" onchange="updateStockAttribute('${safeName}', 'dailyDose', this.value)" style="padding:6px; font-size:12px; margin:0; text-align:right;">
+          </div>
+          <div style="flex:1; min-width:50px;">
+            <label style="font-size:10px; color:#666;">単位</label>
+            <input type="text" placeholder="錠" value="${esc(unitVal)}" onchange="updateStockAttribute('${safeName}', 'unit', this.value)" style="padding:6px; font-size:12px; margin:0;">
+          </div>
+          <div style="flex:1; min-width:60px;">
+            <label style="font-size:10px; color:#666;">処方日数</label>
+            <input type="number" placeholder="日" value="${prescribedDaysVal}" onchange="updateStockAttribute('${safeName}', 'prescribedDays', this.value)" style="padding:6px; font-size:12px; margin:0; text-align:right;">
+          </div>
+        </div>
       <div style="position:relative;">
-        <textarea placeholder="適用" data-name="${esc(item.name)}" oninput="autoResize(this)" onchange="updateStockRemark(this.dataset.name, this.value)" onfocus="showStockHelper(this, '${esc(item.name).replace(/'/g, "\\'")}')" style="width:100%; min-height:3.5em; padding:6px; margin-top:8px; font-size:12px; border:1px solid #ddd; border-radius:4px; background:#fcfcfc; resize:none; font-family:sans-serif; overflow-y:hidden;">${esc(item.remarks||'')}</textarea>
+        <label style="font-size:10px; color:#666;">コメント (旧:適用)</label>
+        <textarea placeholder="コメント" data-name="${esc(item.name)}" oninput="autoResize(this)" onchange="updateStockAttribute(this.dataset.name, 'remarks', this.value)" onfocus="showStockHelper(this, '${esc(item.name).replace(/'/g, "\\'")}')" style="width:100%; min-height:3.5em; padding:6px; margin:0; font-size:12px; border:1px solid #ddd; border-radius:4px; background:#fcfcfc; resize:none; font-family:sans-serif; overflow-y:hidden;">${esc(item.remarks||'')}</textarea>
         <div class="stock-helper" style="display:none; background:#f0f8ff; padding:8px; border:1px solid #cce5ff; border-radius:4px; margin-top:5px; z-index:10;"></div>
       </div>
+      </div>
+
       <div style="margin-top:10px; text-align:right;">
         <button class="btn-sub" onclick="deleteStockItem('${esc(item.name)}')" style="background:#dc3545;">削除</button>
       </div>
@@ -3302,13 +3370,15 @@ function toggleStockHidden(name) {
   rStock();
 }
 
-function updateStockRemark(name, val) {
+function updateStockAttribute(name, key, val) {
   if (!st.stock) st.stock = [];
   let item = st.stock.find(i => i.name === name);
   if (item) {
-    item.remarks = val;
+    item[key] = val;
   } else {
-    st.stock.push({ id: 's' + Date.now(), name: name, qty: 0, remarks: val });
+    const newItem = { id: 's' + Date.now(), name: name, qty: 0 };
+    newItem[key] = val;
+    st.stock.push(newItem);
   }
   save();
 }
@@ -3450,7 +3520,7 @@ function addStockRemarkWord(name, word) {
   else val = word;
   
   ta.value = val;
-  updateStockRemark(name, val);
+  updateStockAttribute(name, 'remarks', val);
   ta.focus();
 }
 // ▲▲▲ 追加 ▲▲▲
