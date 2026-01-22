@@ -677,7 +677,7 @@
           <select id="sel-f" class="main-sel" onchange="st.cur=this.value; st.editF=null; st.editRef=null; r();"></select>
           <h3 id="title-f" style="font-size:14px; margin-bottom:5px;">項目追加</h3>
           <input id="f-n" placeholder="項目名">
-          <select id="f-t" onchange="updateFieldUI()"><option value="text">テキスト(履歴選択)</option><option value="simple_text">テキスト(単純)</option><option value="number">数値</option><option value="select">選択肢</option><option value="date">日付</option><option value="time">時刻</option><option value="camera">カメラ</option><option value="file">ファイル取り込み</option></select>
+          <select id="f-t" onchange="updateFieldUI()"><option value="text">テキスト(履歴選択)</option><option value="simple_text">テキスト(単純)</option><option value="number">数値</option><option value="select">選択肢</option><option value="multi_select">複数選択肢</option><option value="date">日付</option><option value="time">時刻</option><option value="camera">カメラ</option><option value="file">ファイル取り込み</option></select>
           
           <!-- 動的設定エリア -->
           <div id="f-config-area" style="margin-top:10px;"></div>
@@ -1791,6 +1791,22 @@ function rIn(c) {
         });
         h += `</div>`;
         break;
+      case 'multi_select':
+        let mItems = f.options || [];
+        const mVal = val || '';
+        const mSelected = mVal ? String(mVal).split(' ') : [];
+        h += `<input type="hidden" id="i-${f.id}" value="${esc(mVal)}">`;
+        h += `<div id="sel-grp-${f.id}" style="display:flex; flex-wrap:wrap; gap:5px;">`;
+        mItems.forEach(o => {
+            const t = typeof o === 'string' ? o : o.text;
+            const isSel = mSelected.includes(t);
+            const bg = isSel ? '#007bff' : '#fff';
+            const color = isSel ? '#fff' : '#333';
+            const hoverEvents = `onmouseover="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='lightblue'" onmouseout="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='#fff'" ontouchstart="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='lightblue'" ontouchmove="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='#fff'" ontouchcancel="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='#fff'"`;
+            h += `<button type="button" class="btn-sub option-btn" onclick="toggleMultiOption('${f.id}', '${esc(t)}', this)" style="background:${bg}; color:${color}; border:3px solid #ccc; padding:10px; flex:1; min-width:80px;" ${hoverEvents}>${esc(t)}</button>`;
+        });
+        h += `</div>`;
+        break;
       case 'text':
         const vals = val ? String(val).split(' ') : [''];
         h += `<div id="box-${f.id}">`;
@@ -1923,7 +1939,7 @@ function captureFormValues() {
       const inputs = document.querySelectorAll(`.multi-${f.id}`);
       const vals = Array.from(inputs).map(i => i.value.trim()).filter(v => v);
       st.form[f.id] = vals.join(' ');
-    } else if (f.type === 'select') {
+    } else if (f.type === 'select' || f.type === 'multi_select') {
       const el = document.getElementById('i-' + f.id);
       if (el) st.form[f.id] = el.value;
     } else {
@@ -2578,7 +2594,7 @@ function rField(c) {
     document.getElementById('f-n').value = f.name;
     document.getElementById('f-t').value = f.type;
     updateFieldUI(); // UI切り替え
-    if(f.type === 'select' || f.type === 'text') {
+    if(f.type === 'select' || f.type === 'text' || f.type === 'multi_select') {
         // 文字列配列の場合はオブジェクト配列に変換して表示
         const opts = (f.options || []).map(o => typeof o === 'string' ? {text:o} : o);
         renderTextOptionEditor('f-opts-list', opts);
@@ -2597,9 +2613,17 @@ function rField(c) {
 function updateFieldUI() {
   const t = document.getElementById('f-t').value;
   const area = document.getElementById('f-config-area');
+  
+  // 既存のオプションを退避
+  let currentOpts = [];
+  const listEl = document.getElementById('f-opts-list');
+  if (listEl) {
+    currentOpts = getTextOptionItems('f-opts-list');
+  }
+
   area.innerHTML = '';
-  if(t === 'select' || t === 'text') {
-    const isSelect = t === 'select';
+  if(t === 'select' || t === 'text' || t === 'multi_select') {
+    const isSelect = (t === 'select' || t === 'multi_select');
     area.innerHTML = `
       <div style="border:1px solid #ddd; padding:10px; border-radius:8px; background:#f9f9f9;">
         <label>${isSelect ? '選択肢リスト' : '入力候補 (任意)'}</label>
@@ -2607,6 +2631,11 @@ function updateFieldUI() {
         <div id="f-opts-list"></div>
         <div class="list-add-row" style="flex-direction:column;"><input id="f-opt-new" placeholder="項目名" style="width:100%; margin-bottom:5px;"><div style="text-align:right;"><button class="btn-sub" style="background:#28a745" onclick="addTextOptionItem('f-opts-list','f-opt-new')">追加</button></div></div>
       </div>`;
+      
+    // オプションを復元
+    if (currentOpts.length > 0) {
+        renderTextOptionEditor('f-opts-list', currentOpts);
+    }
   }
 }
 function editF(id) {
@@ -2620,7 +2649,7 @@ function saveF() {
   const t = document.getElementById('f-t').value;
   
   let finalOpts;
-  if(t === 'select') {
+  if(t === 'select' || t === 'multi_select') {
     finalOpts = getTextOptionItems('f-opts-list');
   } else if (t === 'text') {
     const newTextOpts = getTextOptionItems('f-opts-list'); // {text, duration}の配列
@@ -7495,6 +7524,28 @@ function selectOption(fid, val, btn) {
     });
   }
   if (!isDeselect) moveFocusToNext(btn);
+}
+
+function toggleMultiOption(fid, val, btn) {
+  const input = document.getElementById('i-' + fid);
+  if (!input) return;
+  
+  let currentVals = input.value ? input.value.split(' ').filter(v=>v) : [];
+  const idx = currentVals.indexOf(val);
+  
+  if (idx > -1) {
+    currentVals.splice(idx, 1);
+    btn.style.background = '#fff';
+    btn.style.color = '#333';
+  } else {
+    currentVals.push(val);
+    btn.style.background = '#007bff';
+    btn.style.color = '#fff';
+  }
+  
+  input.value = currentVals.join(' ');
+  input.dispatchEvent(new Event('change', {bubbles: true}));
+  input.dispatchEvent(new Event('input', {bubbles: true}));
 }
 
 function focusFirstInput() {
