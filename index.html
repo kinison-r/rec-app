@@ -857,23 +857,6 @@
       </details>
 
       <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
-        <summary style="font-weight:bold; cursor:pointer;">アプリアイコン設定</summary>
-        <div class="mt-2">
-          <p style="font-size:11px; color:#666; margin-bottom:10px;">
-            ブラウザのタブやブックマークに表示されるアイコンを変更します。<br>
-            ※ホーム画面に追加済みのアイコンには反映されない場合があります（再追加が必要です）。
-          </p>
-          <div style="text-align:center; margin-bottom:10px;">
-            <img id="current-app-icon" src="" style="width:64px; height:64px; border-radius:12px; border:1px solid #ddd; box-shadow:0 2px 5px rgba(0,0,0,0.1); object-fit: cover;">
-          </div>
-          <div class="d-flex gap-2">
-            <label class="btn-sub" style="flex:1; text-align:center; cursor:pointer; background:#17a2b8; color:white; padding:10px; display:block;">画像を選択<input type="file" accept="image/*" style="display:none;" onchange="handleAppIconInput(this)"></label>
-            <button class="btn-sub" style="flex:1; background:#6c757d;" onclick="resetAppIcon()">デフォルトに戻す</button>
-          </div>
-        </div>
-      </details>
-
-      <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
         <summary style="font-weight:bold; cursor:pointer;">検索設定</summary>
         <div class="mt-2">
           <label for="search-history-count-slider">検索履歴の表示件数: <span id="search-history-count-value">5</span>件</label>
@@ -968,7 +951,6 @@ const FIELD_NAME_POOP_AMOUNT = '便の量';
 const FIELD_NAME_WATER_AMOUNT = '水分量';
 const KEYWORD_MYLAN = 'マイラン';
 const KEYWORD_KREMEZIN = 'クレメジン';
-const DEFAULT_ICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzI4YTc0NSIgcng9IjY0IiByeT0iNjQiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2xkIiBmb250LXNpemU9IjI1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zNWVtIiBmaWxsPSJ3aGl0ZSI+5YGlPC90ZXh0Pjwvc3ZnPg==";
 
 // ★ IndexedDB Helper ★
 const DB_NAME = 'HealthAppDB';
@@ -1695,10 +1677,6 @@ function r() {
       searchHistorySlider.value = count;
       document.getElementById('search-history-count-value').innerText = count;
     }
-    const iconImg = document.getElementById('current-app-icon');
-    if (iconImg) {
-      iconImg.src = (st.settings && st.settings.appIcon) ? st.settings.appIcon : DEFAULT_ICON;
-    }
   }
   if (st.view === 'analysis') {
     const mealHeaderInput = document.getElementById('meal-report-header-fields');
@@ -2090,7 +2068,7 @@ function openImageEditor(dataUrl, fieldId, type = 'record') {
   
   const image = document.getElementById('image-to-edit');
   currentCropper = new Cropper(image, {
-    aspectRatio: (type === 'icon' ? 1 : NaN), viewMode: 1, dragMode: 'move', autoCropArea: 0.9, restore: false, guides: true, center: true,
+    aspectRatio: NaN, viewMode: 1, dragMode: 'move', autoCropArea: 0.9, restore: false, guides: true, center: true,
     highlight: false, cropBoxMovable: true, cropBoxResizable: true, toggleDragModeOnDblclick: false, background: false
   });
 }
@@ -2130,22 +2108,6 @@ function saveEditedImage() {
       canvas = tempCanvas;
   }
   
-  if (currentEditType === 'icon') {
-      const iconCanvas = document.createElement('canvas');
-      iconCanvas.width = 512; iconCanvas.height = 512;
-      iconCanvas.getContext('2d').drawImage(canvas, 0, 0, 512, 512);
-      const resultDataUrl = iconCanvas.toDataURL('image/png');
-      if (!st.settings) st.settings = {};
-      st.settings.appIcon = resultDataUrl;
-      saveSettings();
-      applyAppIcon(resultDataUrl);
-      const iconImg = document.getElementById('current-app-icon');
-      if (iconImg) iconImg.src = resultDataUrl;
-      showToast('アイコンを更新しました');
-      closeImageEditor();
-      return;
-  }
-
   const maxWidth = st.settings.imageMaxWidth || 800;
   const quality = (st.settings.imageQuality || 80) / 100;
   let outputCanvas = canvas;
@@ -2171,30 +2133,6 @@ function saveEditedImage() {
       rIn(c);
   }
   closeImageEditor();
-}
-// ▲▲▲ 追加 ▲▲▲
-
-// ▼▼▼ 追加: アプリアイコン設定機能 ▼▼▼
-function handleAppIconInput(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => { openImageEditor(e.target.result, null, 'icon'); };
-  reader.readAsDataURL(file);
-  input.value = '';
-}
-function resetAppIcon() {
-  if (!confirm('アイコンをデフォルトに戻しますか？')) return;
-  if (!st.settings) st.settings = {};
-  delete st.settings.appIcon;
-  saveSettings();
-  applyAppIcon(DEFAULT_ICON);
-  const iconImg = document.getElementById('current-app-icon');
-  if (iconImg) iconImg.src = DEFAULT_ICON;
-  showToast('アイコンをリセットしました');
-}
-function applyAppIcon(dataUrl) {
-  document.querySelectorAll("link[rel*='icon']").forEach(link => link.href = dataUrl);
 }
 // ▲▲▲ 追加 ▲▲▲
 
@@ -3150,7 +3088,11 @@ function getStockData() {
     } else if (sortKey === 'dt') {
       return sortAsc ? a.dt - b.dt : b.dt - a.dt;
     } else {
-      return sortAsc ? valA - valB : valB - valA;
+      // 数値比較 (qty, estStock)
+      // nullの場合は無限大扱いとして末尾に送る（昇順＝少ない順のとき）
+      const numA = (valA !== null && valA !== undefined) ? valA : (sortAsc ? Infinity : -Infinity);
+      const numB = (valB !== null && valB !== undefined) ? valB : (sortAsc ? Infinity : -Infinity);
+      return sortAsc ? numA - numB : numB - numA;
     }
   });
 
@@ -3188,6 +3130,7 @@ function rStock() {
           <button class="btn-sub" onclick="setStockSort('name')" style="${sortKey==='name'?'background:#007bff;color:white;':''}">名前</button>
           <button class="btn-sub" onclick="setStockSort('remarks')" style="${sortKey==='remarks'?'background:#007bff;color:white;':''}">摘要</button>
           <button class="btn-sub" onclick="setStockSort('qty')" style="${sortKey==='qty'?'background:#007bff;color:white;':''}">在庫数</button>
+          <button class="btn-sub" onclick="setStockSort('estStock')" style="${sortKey==='estStock'?'background:#007bff;color:white;':''}">不足順(予測)</button>
           <button class="btn-sub" onclick="setStockSort('dt')" style="${sortKey==='dt'?'background:#007bff;color:white;':''}">更新日</button>
           <span style="cursor:pointer; margin-left:5px;" onclick="toggleStockSortOrder()">${sortAsc ? '▲' : '▼'}</span>
         </div>
@@ -7681,69 +7624,6 @@ function selectOption(fid, val, btn) {
   if (!isDeselect) moveFocusToNext(btn);
 }
 
-function toggleMultiOption(fid, val, btn) {
-  const input = document.getElementById('i-' + fid);
-  if (!input) return;
-  
-  let currentVals = input.value ? input.value.split(' ').filter(v=>v) : [];
-  const idx = currentVals.indexOf(val);
-  
-  if (idx > -1) {
-    currentVals.splice(idx, 1);
-    btn.style.background = '#fff';
-    btn.style.color = '#333';
-  } else {
-    currentVals.push(val);
-    btn.style.background = '#007bff';
-    btn.style.color = '#fff';
-  }
-  
-  input.value = currentVals.join(' ');
-  input.dispatchEvent(new Event('change', {bubbles: true}));
-  input.dispatchEvent(new Event('input', {bubbles: true}));
-}
-
-function focusFirstInput() {
-  const form = document.getElementById('form-in');
-  if (!form) return;
-  const selector = 'select:not([disabled]), input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), button.option-btn';
-  const first = form.querySelector(selector);
-  if (first) first.focus();
-}
-
-function moveFocusToNext(current) {
-  const form = document.getElementById('form-in');
-  if (!form) return;
-  const selector = 'select:not([disabled]), input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), button.btn-main:not([disabled]), button.option-btn';
-  const focusables = Array.from(form.querySelectorAll(selector));
-  const idx = focusables.indexOf(current);
-  if (idx > -1) {
-    let nextIdx = idx + 1;
-    if (current.classList.contains('option-btn')) {
-        const currentFid = current.dataset.fid;
-        while (nextIdx < focusables.length) {
-            const nextEl = focusables[nextIdx];
-            if (nextEl.classList.contains('option-btn') && nextEl.dataset.fid === currentFid) nextIdx++;
-            else break;
-        }
-    }
-    if (nextIdx < focusables.length) focusables[nextIdx].focus();
-  }
-}
-
-const formInEl = document.getElementById('form-in');
-if (formInEl) {
-  formInEl.addEventListener('change', (e) => {
-    if (e.target.matches('select, input, textarea') && e.target.type !== 'file' && e.target.type !== 'hidden') moveFocusToNext(e.target);
-  });
-  formInEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && e.target.matches('input')) { e.preventDefault(); moveFocusToNext(e.target); }
-  });
-}
-// ▲▲▲ 追加 ▲▲▲
-</script>
-</body>
-</html>
 function toggleMultiOption(fid, val, btn) {
   const input = document.getElementById('i-' + fid);
   if (!input) return;
