@@ -2706,6 +2706,21 @@ window.clearSearch = function() {
   } catch (e) { showCopyableError('検索クリア処理エラー', e.stack); }
 };
 
+async function expSearchCSV() {
+  if (!analysisRecordsCache || analysisRecordsCache.length === 0) { alert('出力するデータがありません。'); return; }
+  
+  let txt = "\uFEFFカテゴリ,日時,内容\n";
+  analysisRecordsCache.forEach(rec => {
+    const data = rec._fs.map(f => `${f.name}:${rec[f.id]||''}`).join('|');
+    txt += `${rec._cn},${toJSTISOString(getDt(rec))},"${data.replace(/"/g, '""')}"\n`;
+  });
+
+  const blob = new Blob([txt], {type:'text/csv'});
+  const ts = getTS();
+  const name = `${VERSION}_${ts}_search_result.csv`;
+  if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
+}
+
 // ▼▼▼ 追加: 1日あたりの消費量推定ヘルパー ▼▼▼
 function estimateDailyDose(text) {
   if (!text) return 0;
@@ -3694,18 +3709,26 @@ function rAnlz(resetPage = false, saveHistory = false) {
 
   const currentPage = st.pagination.analysis;
   const totalRecords = analysisRecordsCache.length;
+  const totalAll = allRecords.length;
   const startIndex = (currentPage - 1) * RECS_PER_PAGE;
   const endIndex = startIndex + RECS_PER_PAGE;
   const paginatedRecords = analysisRecordsCache.slice(startIndex, endIndex);
 
+  const countHtml = `<div style="padding:5px 10px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; background:#fff; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+      <span style="font-size:12px; font-weight:bold; color:#555;">検索: ${totalRecords}件 <span style="font-size:10px; color:#999;">(全${totalAll}件)</span></span>
+      <button class="btn-sub" style="background:#28a745; color:white; padding:4px 10px;" onclick="expSearchCSV()">CSV出力</button>
+  </div>`;
+
   if (totalRecords === 0) {
     const msg = (sRaw || sNotRaw || startDateVal || endDateVal) ? '指定された条件に一致する記録はありません。' : '表示する記録がありません。';
-    document.getElementById('list-anlz').innerHTML = `<div class="card" style="text-align:center; color:#666;">${msg}</div>`;
+    let html = (totalAll > 0) ? countHtml : '';
+    html += `<div class="card" style="text-align:center; color:#666;">${msg}</div>`;
+    document.getElementById('list-anlz').innerHTML = html;
     document.getElementById('pagination-anlz').innerHTML = '';
     return;
   }
 
-  document.getElementById('list-anlz').innerHTML = paginatedRecords.map(rec => `
+  document.getElementById('list-anlz').innerHTML = countHtml + paginatedRecords.map(rec => `
     <div class="rec-row">
       <button class="rec-body" onclick="editRec('${rec._cid}','${rec.id}')">
         <small><span class="cat-tag" style="background:${rec._cc}20; color:${rec._cc}; border:1px solid ${rec._cc}40;">${rec._icon} ${highlight(rec._cn, sRaw)}</span> ${formatDateYMDHM(getDt(rec))}</small>
