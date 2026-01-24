@@ -69,6 +69,7 @@
     .text-right { text-align: right; }
     .w-auto { width: auto; }
     /* ▲▲▲ 追加 ▲▲▲ */
+    
     .card {
       background: #fff;
       padding: 15px;
@@ -78,7 +79,7 @@
     }
     .nav {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 4px;
       position: fixed;
       top: 0;
@@ -379,7 +380,6 @@
     <button data-view="input" id="b-input" class="active">記録</button>
     <button data-view="search" id="b-search">検索</button>
     <button data-view="analysis" id="b-analysis">分析</button>
-    <button data-view="stock" id="b-stock">在庫</button>
     <button data-view="maint" id="b-maint">保守</button>
   </div>
 
@@ -432,24 +432,18 @@
     <div id="pagination-anlz" class="pagination-controls"></div>
   </div>
 
-  <div id="s-stock" style="display:none">
-    <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-      <h2 class="section-title" style="margin:0; border:none; padding:0;">在庫管理</h2>
-      <div class="d-flex gap-1">
-        <button class="btn-sub" style="background:#6f42c1; color:white; font-weight:bold; padding:8px 15px;" onclick="showStockPrint()">残薬リスト</button>
-        <button class="btn-sub" style="background:#28a745; color:white; font-weight:bold; padding:8px 15px;" onclick="expStockCSV()">CSV出力</button>
-        <button class="btn-sub" style="background:#17a2b8; color:white; font-weight:bold; padding:8px 15px;" onclick="importStockFromRecords()">薬剤取込</button>
-      </div>
-    </div>
-    <div id="list-stock"></div>
-    <div id="stock-print-area" class="card" style="display:none;"></div>
-  </div>
-
   <div id="s-analysis" style="display:none">
     <div class="card">
       <h2 class="section-title">分析</h2>
       
-      <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;" open>
+      <details id="stock-details" style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;" ontoggle="if(this.open) rStock()">
+        <summary style="font-weight:bold; cursor:pointer;">在庫管理</summary>
+        <div class="mt-2">
+          <div id="list-stock"></div>
+        </div>
+      </details>
+
+      <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
         <summary style="font-weight:bold; cursor:pointer;">データ分析 (統合)</summary>
         <div class="mt-2">
           <!-- ファイル管理 -->
@@ -603,6 +597,7 @@
 
     <div id="list-anlz"></div>
     <div id="pagination-anlz" class="pagination-controls"></div>
+    <div id="stock-print-area" class="card" style="display:none;"></div>
   </div>
 
   <div id="s-maint" style="display:none">
@@ -1179,6 +1174,18 @@ function formatDateYMDHM(d) {
   if (isNaN(date.getTime())) return '';
   return `${formatDateYMD(date)} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}:${String(date.getSeconds()).padStart(2,'0')}`;
 }
+// ▼▼▼ 追加: 曜日表示ヘルパー ▼▼▼
+function getDowStr(dateVal) {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  const weeks = ['(日)', '(月)', '(火)', '(水)', '(木)', '(金)', '(土)'];
+  return weeks[d.getDay()];
+}
+function updateDayOfWeek(input, spanId) {
+  const span = document.getElementById(spanId);
+  if (span) span.innerText = getDowStr(input.value);
+}
 // ▲▲▲ 追加 ▲▲▲
 
 async function save(skipBackup = false) {
@@ -1466,7 +1473,7 @@ function r() {
   // 背景色リセット
   document.body.style.background = '#f0f2f5';
 
-  ['input', 'search', 'analysis', 'stock', 'maint'].forEach(n => {
+  ['input', 'search', 'analysis', 'maint'].forEach(n => {
     document.getElementById('s-' + n).style.display = (st.view === n ? 'block' : 'none');
   });
 
@@ -1553,9 +1560,6 @@ function r() {
       } else { areaNot.innerHTML = ''; }
     }
     rAnlz(true, false);
-  }
-  if (st.view === 'stock') {
-    rStock();
   }
   if (st.view === 'maint') {
     rCat();
@@ -1759,11 +1763,13 @@ function rIn(c) {
       </div>
     `;
     if (!isCopy) {
+      const editDow = getDowStr(`${yyyy}-${mm}-${dd}`);
       editHtml += `
         <div style="border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-bottom: 15px; background: #f9f9f9;">
           <label style="font-weight:bold; color:#333;">日時変更</label>
-          <div style="display:flex; gap:10px;">
-            <input type="date" id="edit-date" value="${yyyy}-${mm}-${dd}" style="flex:1.5;">
+          <div style="display:flex; gap:10px; align-items:center;">
+            <input type="date" id="edit-date" value="${yyyy}-${mm}-${dd}" style="flex:1.5;" oninput="updateDayOfWeek(this, 'edit-dow')">
+            <span id="edit-dow" style="font-size:12px; color:#666; min-width:2.5em;">${editDow}</span>
             <input type="time" id="edit-time" value="${hh}:${mi}:${ss}" step="1" style="flex:1;">
           </div>
         </div>
@@ -1839,7 +1845,11 @@ function rIn(c) {
         h += `<input type="number" id="i-${f.id}" value="${esc(val)}">`;
         break;
       case 'date':
-        h += `<input type="date" id="i-${f.id}" value="${esc(val)}">`;
+        const dow = getDowStr(val);
+        h += `<div style="display:flex; align-items:center; gap:5px;">
+          <input type="date" id="i-${f.id}" value="${esc(val)}" oninput="updateDayOfWeek(this, 'dow-${f.id}')" style="flex:1; margin:0;">
+          <span id="dow-${f.id}" style="font-size:14px; color:#666; min-width:2.5em;">${dow}</span>
+        </div>`;
         break;
       case 'time':
         h += `<input type="time" id="i-${f.id}" value="${esc(val)}" step="1">`;
@@ -3123,7 +3133,12 @@ function rStock() {
   
   // ヘッダー部分（ソート・表示切替）
   const headerHtml = `
-    <div class="card" style="padding:10px; background:#f8f9fa;">
+    <div style="padding:10px; background:#f8f9fa; border-radius:8px; margin-bottom:10px; border:1px solid #eee;">
+      <div style="display:flex; justify-content:flex-end; gap:5px; margin-bottom:10px;">
+        <button class="btn-sub" style="background:#6f42c1; color:white; font-weight:bold; padding:4px 10px;" onclick="showStockPrint()">残薬リスト</button>
+        <button class="btn-sub" style="background:#28a745; color:white; font-weight:bold; padding:4px 10px;" onclick="expStockCSV()">CSV出力</button>
+        <button class="btn-sub" style="background:#17a2b8; color:white; font-weight:bold; padding:4px 10px;" onclick="importStockFromRecords()">薬剤取込</button>
+      </div>
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div style="font-size:12px; font-weight:bold;">
           並び替え: 
@@ -3360,12 +3375,12 @@ function showStockPrint() {
   
   const printArea = document.getElementById('stock-print-area');
   const listArea = document.getElementById('list-stock');
-  const ctrlBar = document.querySelector('#s-stock > .card:first-child'); // ヘッダーバー
+  const details = document.getElementById('stock-details');
   
   printArea.innerHTML = html;
   printArea.style.display = 'block';
   listArea.style.display = 'none';
-  if(ctrlBar) ctrlBar.style.display = 'none';
+  if(details) details.style.display = 'none';
   
   window.scrollTo(0, 0);
 }
@@ -3374,8 +3389,8 @@ function closeStockPrint() {
   document.getElementById('stock-print-area').style.display = 'none';
   document.getElementById('stock-print-area').innerHTML = '';
   document.getElementById('list-stock').style.display = 'block';
-  const ctrlBar = document.querySelector('#s-stock > .card:first-child');
-  if(ctrlBar) ctrlBar.style.display = 'flex';
+  const details = document.getElementById('stock-details');
+  if(details) details.style.display = 'block';
 }
 
 function toggleStockHidden(name) {
