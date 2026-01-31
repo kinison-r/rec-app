@@ -403,7 +403,7 @@
            <button class="btn-sub" style="background:#17a2b8; color:white; flex:1; white-space:nowrap; padding:8px;" onclick="searchFutureRecords()">📅 予定・未来 (本日以降)</button>
            <div class="d-flex align-center gap-1" style="flex:1; background:#fff; padding:4px 8px; border-radius:5px; border:1px solid #ddd;">
              <span style="font-size:12px; white-space:nowrap; color:#333; font-weight:bold;">忘れてない？</span>
-             <input type="number" id="past-days-input" value="7" min="1" style="width:40px; padding:5px; text-align:center; margin:0; border:1px solid #eee; border-radius:3px; font-size:12px;">
+             <input type="number" id="past-days-input" value="1" min="1" style="width:40px; padding:5px; text-align:center; margin:0; border:1px solid #eee; border-radius:3px; font-size:12px;">
              <span style="font-size:10px; white-space:nowrap; color:#666;">日前〜</span>
              <button class="btn-sub" style="background:#fd7e14; color:white; padding:4px 10px;" onclick="checkForgottenItems()">確認</button>
            </div>
@@ -2724,17 +2724,23 @@ function searchFutureRecords() {
 
 function checkForgottenItems() {
   const daysInput = document.getElementById('past-days-input');
-  const days = parseFloat(daysInput ? daysInput.value : 7) || 7;
+  const days = parseFloat(daysInput ? daysInput.value : 1) || 1;
   
-  // 基準日時: 現在時刻から X日前 (時刻も含めて比較)
+  // 基準日時: 指定日数の翌日00:00 (例: 1日前なら今日の00:00)
+  // これより新しい記録が必要
   const limitDate = new Date();
-  limitDate.setTime(limitDate.getTime() - days * 24 * 60 * 60 * 1000);
+  limitDate.setDate(limitDate.getDate() - days);
+  limitDate.setHours(24, 0, 0, 0); // 指定日の24:00 (翌日の00:00)
+
+  // 今日の開始日時（回数カウント用）
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
 
   const itemLastSeen = {}; // { "薬剤名": Date }
+  const itemTodayCount = {}; // { "薬剤名": int }
   
-  // 1. 全レコードを走査して、項目の最終利用日時を収集
+  // 1. 全レコードを走査して、項目の最終利用日時と今日の回数を収集
   st.cats.forEach(c => {
-    // 薬剤・サプリ・在庫に関連しそうなフィールドを特定
     const targetFields = c.fields.filter(f => 
         f.name.includes('薬') || f.name.includes('サプリ') || f.name.includes('在庫') || 
         f.type === 'select' || f.type === 'multi_select'
@@ -2747,18 +2753,23 @@ function checkForgottenItems() {
         targetFields.forEach(f => {
             const val = r[f.id];
             if (!val) return;
-            // 値を単語に分割 (スペースやカンマ区切り)
             const items = String(val).split(/[\s,、]+/).filter(s => s);
             items.forEach(item => {
                 if (!itemLastSeen[item] || dt > itemLastSeen[item]) {
                     itemLastSeen[item] = dt;
+                }
+                if (dt >= todayStart) {
+                    itemTodayCount[item] = (itemTodayCount[item] || 0) + 1;
                 }
             });
         });
     });
   });
 
-  // 2. チェック対象の項目リストを作成 (在庫 + 薬剤系フィールドの選択肢)
+  // 2. チェック対象の項目リストを作成
+  const stockMap = {};
+  if (st.stock) st.stock.forEach(s => stockMap[s.name] = s);
+
   const checkTargets = new Set();
   if (st.stock) st.stock.forEach(s => checkTargets.add(s.name));
   st.cats.forEach(c => {
@@ -2772,24 +2783,54 @@ function checkForgottenItems() {
   const forgotten = [];
   checkTargets.forEach(name => {
       if (!name) return;
+      
       const lastDt = itemLastSeen[name];
-      if (lastDt) {
-          // 記録あり。期限切れかチェック
-          if (lastDt < limitDate) forgotten.push({ name: name, date: lastDt, ts: lastDt.getTime() });
-      } else if (st.stock && st.stock.find(s => s.name === name)) {
-          // 記録なし。在庫にあるなら「未使用」として警告対象にする
-          forgotten.push({ name: name, date: null, ts: 0 });
+      const todayCount = itemTodayCount[name] || 0;
+      
+      // 頻度情報の取得 (在庫の備考欄から)
+      let freq = 0;
+      if (stockMap[name] && stockMap[name].remarks) {
+          freq = estimateDailyFrequency(stockMap[name].remarks);
+      }
+
+      // 判定ロジック
+      let isForgotten = false;
+      let msg = '';
+
+      // 1日複数回の場合のチェック (基準日が「今日」の場合のみ有効)
+      if (freq > 1 && limitDate.getTime() >= todayStart.getTime()) {
+          if (todayCount < freq) {
+              isForgotten = true;
+              msg = `本日${todayCount}/${freq}回`;
+          }
+      }
+      
+      // まだNGでなければ、従来の最終日時チェック
+      if (!isForgotten) {
+          if (lastDt) {
+              if (lastDt < limitDate) {
+                  isForgotten = true;
+                  msg = `最終: ${formatDateYMDHM(lastDt)}`;
+              }
+          } else if (stockMap[name]) {
+              // 記録なし (在庫にあるのに一度も使われていない)
+              isForgotten = true;
+              msg = '記録なし';
+          }
+      }
+
+      if (isForgotten) {
+          forgotten.push({ name: name, date: lastDt, ts: lastDt ? lastDt.getTime() : 0, msg: msg });
       }
   });
 
-  if (forgotten.length === 0) alert(`${days}日以内に記録されていない薬剤・項目はありません。`);
+  if (forgotten.length === 0) alert(`${days}日以内に記録されていない（または回数不足の）薬剤・項目はありません。`);
   else {
-      let msg = `【${days}日以上記録がない薬剤・項目】\n(基準: ${formatDateYMDHM(limitDate)})\n\n`;
+      let msg = `【確認が必要な項目】\n(基準: ${formatDateYMDHM(limitDate)} 以降)\n\n`;
       forgotten.sort((a,b) => a.ts - b.ts);
       const maxDisplay = 20;
       forgotten.slice(0, maxDisplay).forEach(f => {
-          const dStr = f.date ? formatDateYMDHM(f.date) : '記録なし';
-          msg += `・${f.name} (最終: ${dStr})\n`;
+          msg += `・${f.name} (${f.msg})\n`;
       });
       if (forgotten.length > maxDisplay) msg += `\n他 ${forgotten.length - maxDisplay} 件...`;
       alert(msg);
@@ -2862,6 +2903,27 @@ function estimateDailyDose(text) {
   // パターン3: "朝夕1錠" (2回), "毎食後1錠" (3回) などの慣用句 - ★優先度を下げる
   if (t.match(/(朝夕|朝晩).*1[錠包個単位瓶]/)) return 2;
   if (t.match(/毎食.*1[錠包個単位瓶]/) || t.match(/朝昼夕.*1[錠包個単位瓶]/)) return 3;
+
+  return 0;
+}
+
+// ▼▼▼ 追加: 1日あたりの回数推定ヘルパー ▼▼▼
+function estimateDailyFrequency(text) {
+  if (!text) return 0;
+  const t = text.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+                .replace(/[\s　]+/g, '');
+  
+  // 頓服などは回数チェックの対象外(0)とする
+  if (t.includes('頓服') || t.includes('時') || t.includes('痛い') || t.includes('発作')) return 0;
+
+  // "1日X回"
+  const match = t.match(/1日(\d+)回/);
+  if (match) return parseInt(match[1]);
+
+  // 慣用句
+  if (t.match(/(朝昼夕|朝昼晩|毎食)/)) return 3;
+  if (t.match(/(朝夕|朝晩)/)) return 2;
+  if (t.match(/(寝る前|起床|朝|昼|夕|晩)/)) return 1; 
 
   return 0;
 }
