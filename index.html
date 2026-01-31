@@ -2719,7 +2719,7 @@ function searchFutureRecords() {
   document.getElementById('anlz-end-date').value = '';
   document.getElementById('srch').value = '';
   if(document.getElementById('srch-cat')) document.getElementById('srch-cat').value = '';
-  rAnlz(true, true);
+  rAnlz(true, true, new Date());
 }
 
 function checkForgottenItems() {
@@ -3720,7 +3720,7 @@ function showStockHistory(id) {}
 // ▲▲▲ 追加 ▲▲▲
 
 // 分析・CSV
-function rAnlz(resetPage = false, saveHistory = false) {
+function rAnlz(resetPage = false, saveHistory = false, customMinDate = null) {
   if (resetPage) {
     st.pagination.analysis = 1;
   }
@@ -3740,6 +3740,9 @@ function rAnlz(resetPage = false, saveHistory = false) {
   const endDateVal = document.getElementById('anlz-end-date').value;
   let startDate = null, endDate = null;
   if (startDateVal) { startDate = new Date(startDateVal); startDate.setHours(0, 0, 0, 0); }
+  if (customMinDate) {
+    if (!startDate || customMinDate > startDate) startDate = customMinDate;
+  }
   if (endDateVal) { endDate = new Date(endDateVal); endDate.setHours(23, 59, 59, 999); }
 
   // 検索履歴保存
@@ -3783,7 +3786,29 @@ function rAnlz(resetPage = false, saveHistory = false) {
 
   let filteredRecs = allRecords.filter(rec => {
     const recDate = getDt(rec);
-    if (startDate && recDate < startDate) return false;
+    // ▼▼▼ 変更: 開始日判定の拡張 (登録日 or 日付項目) ▼▼▼
+    if (startDate) {
+      let hit = (recDate >= startDate);
+      if (!hit) {
+        // 登録日が範囲外でも、日付フィールド(type='date')が範囲内なら対象とする
+        const dateFields = rec._fs.filter(f => f.type === 'date');
+        for (const f of dateFields) {
+          const val = rec[f.id];
+          if (val) {
+            const d = new Date(val);
+            if (!isNaN(d.getTime())) {
+              // 日付項目の場合は「その日の終わり」と比較することで、
+              // 「今日」の予定が現在時刻より前（00:00など）であってもヒットするようにする
+              const dEnd = new Date(d);
+              dEnd.setHours(23, 59, 59, 999);
+              if (dEnd >= startDate) { hit = true; break; }
+            }
+          }
+        }
+      }
+      if (!hit) return false;
+    }
+    // ▲▲▲ 変更 ▲▲▲
     if (endDate && recDate > endDate) return false;
     if (catId && rec._cid !== catId) return false;
     if (sKeywords.length > 0 || sNotKeywords.length > 0) {
