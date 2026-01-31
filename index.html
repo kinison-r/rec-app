@@ -2006,21 +2006,16 @@ async function handleFileInput(input, fieldId) {
     const file = input.files[0];
     if (!file) return;
 
-    // 画像の場合は圧縮を試みる
+    // 画像の場合は編集画面を開く (圧縮・回転・明るさ調整のため)
     if (file.type.startsWith('image/')) {
-        try {
-            const maxWidth = st.settings.imageMaxWidth || 800;
-            const resizedDataUrl = await resizeImage(file, maxWidth);
-            st.form[fieldId] = resizedDataUrl;
-            // ファイル名を.jpgに変更して保存
-            let name = file.name;
-            const lastDot = name.lastIndexOf('.');
-            if (lastDot > 0) name = name.substring(0, lastDot);
-            st.form[fieldId + '_name'] = name + '.jpg';
-            const c = st.cats.find(x => x.id === st.cur);
-            rIn(c);
-            return;
-        } catch (e) { console.error('Image compression failed:', e); }
+        st.tempEditFileName = file.name;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            openImageEditor(e.target.result, fieldId);
+        };
+        reader.readAsDataURL(file);
+        input.value = '';
+        return;
     }
 
     if (file.size > 5 * 1024 * 1024) { alert('ファイルサイズが大きすぎます (上限5MB)'); input.value = ''; return; }
