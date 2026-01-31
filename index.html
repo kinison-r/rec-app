@@ -396,6 +396,20 @@
   <div id="s-search" style="display:none">
     <div class="card">
       <h2 class="section-title">記録検索</h2>
+      <!-- ▼▼▼ 追加: クイック検索エリア ▼▼▼ -->
+      <div style="background:#e7f1ff; padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid #b6d4fe;">
+        <div style="font-size:12px; font-weight:bold; color:#0056b3; margin-bottom:5px;">クイック検索</div>
+        <div class="d-flex gap-2 align-center" style="flex-wrap:wrap;">
+           <button class="btn-sub" style="background:#17a2b8; color:white; flex:1; white-space:nowrap; padding:8px;" onclick="searchFutureRecords()">📅 予定・未来 (本日以降)</button>
+           <div class="d-flex align-center gap-1" style="flex:1; background:#fff; padding:4px 8px; border-radius:5px; border:1px solid #ddd;">
+             <span style="font-size:12px; white-space:nowrap; color:#333; font-weight:bold;">忘れてない？</span>
+             <input type="number" id="past-days-input" value="7" min="1" style="width:40px; padding:5px; text-align:center; margin:0; border:1px solid #eee; border-radius:3px; font-size:12px;">
+             <span style="font-size:10px; white-space:nowrap; color:#666;">日前〜</span>
+             <button class="btn-sub" style="background:#fd7e14; color:white; padding:4px 10px;" onclick="checkForgottenItems()">確認</button>
+           </div>
+        </div>
+      </div>
+      <!-- ▲▲▲ 追加 ▲▲▲ -->
       <div class="d-grid gap-2 mb-2">
         <select id="srch-cat" style="margin:0; padding:12px; border:1px solid #ddd; border-radius:8px; font-size:16px; background:#fcfcfc;"><option value="">全カテゴリー</option></select>
         <input type="text" id="srch" list="srch-datalist" placeholder="キーワードで絞り込み..." style="margin:0;">
@@ -2698,6 +2712,91 @@ function delF(id) {
   }
 }
 
+// ▼▼▼ 追加: クイック検索・チェック機能 ▼▼▼
+function searchFutureRecords() {
+  const today = new Date();
+  document.getElementById('anlz-start-date').value = formatDateYMD(today);
+  document.getElementById('anlz-end-date').value = '';
+  document.getElementById('srch').value = '';
+  if(document.getElementById('srch-cat')) document.getElementById('srch-cat').value = '';
+  rAnlz(true, true);
+}
+
+function checkForgottenItems() {
+  const daysInput = document.getElementById('past-days-input');
+  const days = parseFloat(daysInput ? daysInput.value : 7) || 7;
+  
+  // 基準日時: 現在時刻から X日前 (時刻も含めて比較)
+  const limitDate = new Date();
+  limitDate.setTime(limitDate.getTime() - days * 24 * 60 * 60 * 1000);
+
+  const itemLastSeen = {}; // { "薬剤名": Date }
+  
+  // 1. 全レコードを走査して、項目の最終利用日時を収集
+  st.cats.forEach(c => {
+    // 薬剤・サプリ・在庫に関連しそうなフィールドを特定
+    const targetFields = c.fields.filter(f => 
+        f.name.includes('薬') || f.name.includes('サプリ') || f.name.includes('在庫') || 
+        f.type === 'select' || f.type === 'multi_select'
+    );
+    
+    if (targetFields.length === 0) return;
+
+    c.records.forEach(r => {
+        const dt = getDt(r);
+        targetFields.forEach(f => {
+            const val = r[f.id];
+            if (!val) return;
+            // 値を単語に分割 (スペースやカンマ区切り)
+            const items = String(val).split(/[\s,、]+/).filter(s => s);
+            items.forEach(item => {
+                if (!itemLastSeen[item] || dt > itemLastSeen[item]) {
+                    itemLastSeen[item] = dt;
+                }
+            });
+        });
+    });
+  });
+
+  // 2. チェック対象の項目リストを作成 (在庫 + 薬剤系フィールドの選択肢)
+  const checkTargets = new Set();
+  if (st.stock) st.stock.forEach(s => checkTargets.add(s.name));
+  st.cats.forEach(c => {
+      c.fields.forEach(f => {
+          if (f.name.includes('薬') || f.name.includes('サプリ')) {
+              if (f.options) f.options.forEach(o => checkTargets.add(typeof o === 'string' ? o : o.text));
+          }
+      });
+  });
+
+  const forgotten = [];
+  checkTargets.forEach(name => {
+      if (!name) return;
+      const lastDt = itemLastSeen[name];
+      if (lastDt) {
+          // 記録あり。期限切れかチェック
+          if (lastDt < limitDate) forgotten.push({ name: name, date: lastDt, ts: lastDt.getTime() });
+      } else if (st.stock && st.stock.find(s => s.name === name)) {
+          // 記録なし。在庫にあるなら「未使用」として警告対象にする
+          forgotten.push({ name: name, date: null, ts: 0 });
+      }
+  });
+
+  if (forgotten.length === 0) alert(`${days}日以内に記録されていない薬剤・項目はありません。`);
+  else {
+      let msg = `【${days}日以上記録がない薬剤・項目】\n(基準: ${formatDateYMDHM(limitDate)})\n\n`;
+      forgotten.sort((a,b) => a.ts - b.ts);
+      const maxDisplay = 20;
+      forgotten.slice(0, maxDisplay).forEach(f => {
+          const dStr = f.date ? formatDateYMDHM(f.date) : '記録なし';
+          msg += `・${f.name} (最終: ${dStr})\n`;
+      });
+      if (forgotten.length > maxDisplay) msg += `\n他 ${forgotten.length - maxDisplay} 件...`;
+      alert(msg);
+  }
+}
+// ▲▲▲ 追加 ▲▲▲
+
 window.clearSearch = function() {
   try {
     if(document.getElementById('srch-cat')) document.getElementById('srch-cat').value = '';
@@ -3722,9 +3821,14 @@ function rAnlz(resetPage = false, saveHistory = false) {
 
   analysisRecordsCache = filteredRecs;
 
+  renderAnalysisList();
+}
+
+// ▼▼▼ 追加: 検索結果描画ロジックの分離 ▼▼▼
+function renderAnalysisList() {
   const currentPage = st.pagination.analysis;
   const totalRecords = analysisRecordsCache.length;
-  const totalAll = allRecords.length;
+  const totalAll = st.cats.reduce((sum, c) => sum + c.records.length, 0);
   const startIndex = (currentPage - 1) * RECS_PER_PAGE;
   const endIndex = startIndex + RECS_PER_PAGE;
   const paginatedRecords = analysisRecordsCache.slice(startIndex, endIndex);
@@ -3735,13 +3839,22 @@ function rAnlz(resetPage = false, saveHistory = false) {
   </div>`;
 
   if (totalRecords === 0) {
-    const msg = (sRaw || sNotRaw || startDateVal || endDateVal) ? '指定された条件に一致する記録はありません。' : '表示する記録がありません。';
+    // 検索条件入力欄の状態を確認
+    const sRaw = document.getElementById('srch').value.trim();
+    const sNotRaw = document.getElementById('srch-not') ? document.getElementById('srch-not').value.trim() : '';
+    const startDateVal = document.getElementById('anlz-start-date').value;
+    const endDateVal = document.getElementById('anlz-end-date').value;
+    
+    const msg = (sRaw || sNotRaw || startDateVal || endDateVal) ? '条件に一致する記録はありません。' : '表示する記録がありません。';
     let html = (totalAll > 0) ? countHtml : '';
     html += `<div class="card" style="text-align:center; color:#666;">${msg}</div>`;
     document.getElementById('list-anlz').innerHTML = html;
     document.getElementById('pagination-anlz').innerHTML = '';
     return;
   }
+
+  // ハイライト用のキーワード取得
+  const sRaw = document.getElementById('srch').value.trim();
 
   document.getElementById('list-anlz').innerHTML = countHtml + paginatedRecords.map(rec => `
     <div class="rec-row">
@@ -3766,6 +3879,7 @@ function rAnlz(resetPage = false, saveHistory = false) {
   
   renderPaginationControls('pagination-anlz', currentPage, totalRecords, "changeAnalysisPage");
 }
+// ▲▲▲ 追加 ▲▲▲
 
 function setSearchKeyword(text) {
   document.getElementById('srch').value = text;
@@ -4003,7 +4117,7 @@ function changeInputPage(direction) {
 function changeAnalysisPage(direction) {
   let newPage = st.pagination.analysis + direction;
   st.pagination.analysis = newPage;
-  rAnlz(false, false);
+  renderAnalysisList(); // ページ切り替え時は再検索せず描画のみ更新
 }
 
 // 排便カレンダー
