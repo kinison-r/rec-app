@@ -1346,23 +1346,37 @@ function updateSearchSetting(key, value) {
 
 // ▼▼▼ 追加: リアルタイムバックアップ機能 ▼▼▼
 let saveDirHandle = null;
+let isBackupInProgress = false;
 
 async function realtimeBackup() {
-  const data = {
-    format: 'full_backup',
-    version: VERSION,
-    cats: st.cats,
-    stock: st.stock || [],
-    settings: st.settings || {},
-    extFiles: st.extFiles || []
-  };
-  const jsonStr = JSON.stringify(data, jsonJstReplacer, 2);
-  const blob = new Blob([jsonStr], {type:'application/json'});
-  const filename = '行動ログ６１０リアルバックアップ.json';
+  if (isBackupInProgress) {
+    console.warn('Skipping realtime backup: Previous backup is still in progress.');
+    return;
+  }
+  isBackupInProgress = true;
 
-  // saveBlobに任せる（ディレクトリ設定があればそこに上書きされる）
-  await saveBlob(blob, filename);
-  if (saveDirHandle) showToast('自動バックアップを保存しました');
+  try {
+    const data = {
+      format: 'full_backup',
+      version: VERSION,
+      cats: st.cats,
+      stock: st.stock || [],
+      settings: st.settings || {},
+      extFiles: st.extFiles || []
+    };
+    const jsonStr = JSON.stringify(data, jsonJstReplacer, 2);
+    const blob = new Blob([jsonStr], {type:'application/json'});
+    const filename = '行動ログ６１０リアルバックアップ.json';
+
+    // saveBlobに任せる（ディレクトリ設定があればそこに上書きされる）
+    await saveBlob(blob, filename);
+    if (saveDirHandle) showToast('自動バックアップを保存しました');
+  } catch (e) {
+    console.error('Realtime backup failed:', e);
+    showToast('自動バックアップ失敗: ' + e.message);
+  } finally {
+    isBackupInProgress = false;
+  }
 }
 
 async function updateSaveDirectoryStatus() {
@@ -3978,6 +3992,49 @@ function setSearchNotKeyword(text) {
   rAnlz(true, true);
 }
 
+// ▼▼▼ 追加: 安全な書き込みヘルパー (一時ファイル経由) ▼▼▼
+async function writeSafe(dirHandle, filename, blob) {
+  const tempName = `${filename}.tmp.${Date.now()}`;
+  let tempHandle = null;
+  try {
+    // 1. 一時ファイル作成・書き込み
+    tempHandle = await dirHandle.getFileHandle(tempName, { create: true });
+    const writable = await tempHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+
+    // 2. リネーム (move)
+    if (tempHandle.move) {
+      // ターゲットファイルが存在する場合は削除しておく (上書きのため)
+      try {
+        await dirHandle.removeEntry(filename);
+      } catch (e) {
+        // ファイルが存在しない場合はNotFoundErrorになるので無視
+        if (e.name !== 'NotFoundError') console.warn('Target file remove failed:', e);
+      }
+      // リネーム実行
+      await tempHandle.move(filename);
+    } else {
+      throw new Error('move() method not supported');
+    }
+    return true;
+  } catch (e) {
+    console.warn('Safe write failed, falling back to direct write:', e);
+    // 失敗時は一時ファイルを削除
+    if (tempHandle) {
+      try { await dirHandle.removeEntry(tempName); } catch (cleanupErr) {}
+    }
+    
+    // フォールバック: 直接書き込み
+    const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return true;
+  }
+}
+// ▲▲▲ 追加 ▲▲▲
+
 // ファイル保存ヘルパー（File System Access API対応）
 async function saveBlob(blob, name) {
   try {
@@ -3990,19 +4047,11 @@ async function saveBlob(blob, name) {
              // 権限拒否された場合はフォールバックへ
          } else {
              // 権限取得成功
-             const fileHandle = await saveDirHandle.getFileHandle(name, { create: true });
-             const writable = await fileHandle.createWritable();
-             await writable.write(blob);
-             await writable.close();
-             return true;
+             return await writeSafe(saveDirHandle, name, blob);
          }
       } else {
          // 権限あり
-         const fileHandle = await saveDirHandle.getFileHandle(name, { create: true });
-         const writable = await fileHandle.createWritable();
-         await writable.write(blob);
-         await writable.close();
-         return true;
+         return await writeSafe(saveDirHandle, name, blob);
       }
     }
 
