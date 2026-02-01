@@ -2295,6 +2295,122 @@ function clearForm() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// ▼▼▼ 追加: 在庫補正用ヘルパー ▼▼▼
+function parseStockValue(stockStr, drugNames) {
+  const result = {};
+  if (!stockStr) return result;
+  const s = String(stockStr);
+  
+  let foundKeyed = false;
+  drugNames.forEach(name => {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // "Name:Val" or "Name=Val"
+    const match = s.match(new RegExp(`${escapedName}\\s*[:=]\\s*(-?\\d+(\\.\\d+)?)`));
+    if (match) {
+      result[name] = parseFloat(match[1]);
+      foundKeyed = true;
+    }
+  });
+
+  // キーが見つからず、かつ薬剤が1つの場合は単一数値として解析
+  if (!foundKeyed && drugNames.length === 1) {
+    const match = s.match(/^-?\d+(\.\d+)?$/);
+    if (match) {
+      result[drugNames[0]] = parseFloat(match[0]);
+    }
+  }
+  return result;
+}
+
+function propagateStockCorrection(c, originalRecord, newForm) {
+  const fDrug = c.fields.find(f => f.name === '薬剤');
+  const fStock = c.fields.find(f => f.name === '帳簿在庫数');
+  
+  if (!fDrug || !fStock) return;
+
+  const oldDrugVal = originalRecord[fDrug.id];
+  const oldStockVal = originalRecord[fStock.id];
+  const newDrugVal = newForm[fDrug.id];
+  const newStockVal = newForm[fStock.id];
+
+  // 薬剤名が変更されている場合は追跡困難なため対象外
+  if (oldDrugVal !== newDrugVal) return; 
+  if (!oldStockVal || !newStockVal) return;
+  if (oldStockVal === newStockVal) return;
+
+  const drugs = oldDrugVal.split(/[\s,]+/).filter(d => d);
+  const oldMap = parseStockValue(oldStockVal, drugs);
+  const newMap = parseStockValue(newStockVal, drugs);
+  
+  const diffs = {};
+  let hasDiff = false;
+  drugs.forEach(d => {
+    if (oldMap[d] !== undefined && newMap[d] !== undefined) {
+      const diff = newMap[d] - oldMap[d];
+      // 浮動小数点の誤差を考慮して判定
+      if (Math.abs(diff) > 0.000001) {
+        diffs[d] = diff;
+        hasDiff = true;
+      }
+    }
+  });
+
+  if (!hasDiff) return;
+
+  if (!confirm('在庫数の変更を検出しました。\nこの変更（差分）を、この記録以降のすべての在庫記録に反映（洗い替え）しますか？\n\n※「OK」を押すと、未来の記録の在庫数が自動的に補正されます。')) return;
+
+  const targetDate = getDt(originalRecord);
+  let count = 0;
+
+  c.records.forEach(r => {
+    if (r.id === originalRecord.id) return; // 自分自身はsaveRecで更新されるのでスキップ
+    if (getDt(r) <= targetDate) return; // 過去または同時の記録は対象外
+
+    const rDrugVal = r[fDrug.id];
+    const rStockVal = r[fStock.id];
+    if (!rDrugVal || !rStockVal) return;
+
+    const rDrugs = rDrugVal.split(/[\s,]+/).filter(d => d);
+    // 変更があった薬剤を含む記録かチェック
+    const relevantDrugs = rDrugs.filter(d => diffs[d] !== undefined);
+    if (relevantDrugs.length === 0) return;
+
+    const rMap = parseStockValue(rStockVal, rDrugs);
+    let modified = false;
+    
+    relevantDrugs.forEach(d => {
+      if (rMap[d] !== undefined) {
+        rMap[d] += diffs[d];
+        // 誤差対策
+        rMap[d] = parseFloat(rMap[d].toFixed(6));
+        modified = true;
+      }
+    });
+
+    if (modified) {
+      // 在庫文字列の再構築
+      if (rDrugs.length === 1 && Object.keys(rMap).length === 1) {
+         r[fStock.id] = rMap[rDrugs[0]];
+      } else {
+         // "Name:Val Name:Val" 形式
+         const parts = rDrugs.map(d => {
+             const val = rMap[d] !== undefined ? rMap[d] : '?';
+             return `${d}:${val}`;
+         });
+         r[fStock.id] = parts.join(' ');
+      }
+      count++;
+    }
+  });
+  
+  if (count > 0) {
+      showToast(`${count}件の未来の記録を補正しました`);
+  } else {
+      showToast('補正対象の未来の記録はありませんでした');
+  }
+}
+// ▲▲▲ 追加 ▲▲▲
+
 function saveRec() {
   const c = st.cats.find(x => x.id === st.cur);
   if (!c) return;
@@ -2341,6 +2457,11 @@ function saveRec() {
     if (recordIndex === -1) { cancelEdit(); return; }
 
     const originalRecord = c.records[recordIndex];
+    
+    // ▼▼▼ 追加: 在庫補正 ▼▼▼
+    propagateStockCorrection(c, originalRecord, st.form);
+    // ▲▲▲ 追加 ▲▲▲
+
     const updatedRecord = { ...originalRecord, ...st.form };
 
     // 日時変更の処理
@@ -3938,8 +4059,11 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sor
     if (sortRadioAsc && sortRadioAsc.checked) isAsc = true;
   }
 
-  // ソート用日付取得関数
-  const getSortDate = (rec) => {
+  // ソート用日付情報の計算と付与
+  const criterion = startDate ? new Date(startDate) : new Date();
+  criterion.setHours(0, 0, 0, 0);
+
+  filteredRecs.forEach(rec => {
     // 日付フィールドの値を確認
     const dateFields = rec._fs.filter(f => f.type === 'date');
     const validDates = [];
@@ -3947,35 +4071,35 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sor
         const val = rec[f.id];
         if (val) {
             const d = new Date(val);
-            if (!isNaN(d.getTime())) validDates.push(d);
+            if (!isNaN(d.getTime())) validDates.push({ date: d, label: f.name });
         }
     });
 
-    // 基準日（検索開始日があればそれ、なければ今日）
-    const criterion = startDate ? new Date(startDate) : new Date();
-    criterion.setHours(0, 0, 0, 0);
-
     // 基準日以降の日付項目があれば、それを優先する
     const futureDates = validDates.filter(d => {
-        const dCheck = new Date(d);
+        const dCheck = new Date(d.date);
         dCheck.setHours(23, 59, 59, 999); // その日の終わりまで含める
         return dCheck >= criterion;
     });
 
     if (futureDates.length > 0) {
         // 未来の日付の中で最も直近のものを採用
-        futureDates.sort((a, b) => a - b);
-        return futureDates[0];
+        futureDates.sort((a, b) => a.date - b.date);
+        rec._sortDate = futureDates[0].date;
+        rec._sortLabel = futureDates[0].label;
+        rec._isScheduled = true;
+    } else {
+        // なければ登録日時を使用
+        rec._sortDate = getDt(rec);
+        rec._sortLabel = '登録日時';
+        rec._isScheduled = false;
     }
-
-    // なければ登録日時を使用
-    return getDt(rec);
-  };
+  });
 
   if (isAsc) {
-    filteredRecs.sort((a, b) => getSortDate(a) - getSortDate(b));
+    filteredRecs.sort((a, b) => a._sortDate - b._sortDate);
   } else {
-    filteredRecs.sort((a, b) => getSortDate(b) - getSortDate(a));
+    filteredRecs.sort((a, b) => b._sortDate - a._sortDate);
   }
 
   analysisRecordsCache = filteredRecs;
@@ -4015,10 +4139,17 @@ function renderAnalysisList() {
   // ハイライト用のキーワード取得
   const sRaw = document.getElementById('srch').value.trim();
 
-  document.getElementById('list-anlz').innerHTML = countHtml + paginatedRecords.map(rec => `
+  document.getElementById('list-anlz').innerHTML = countHtml + paginatedRecords.map(rec => {
+    let dateHtml = formatDateYMDHM(getDt(rec));
+    if (rec._isScheduled) {
+       // 予定日がある場合はそれをメインに
+       const dow = getDowStr(rec._sortDate);
+       dateHtml = `<span style="color:#0056b3; font-weight:bold;">${formatDateYMD(rec._sortDate)}${dow} <span style="font-size:10px; font-weight:normal; color:#555;">(${rec._sortLabel})</span></span> <span style="font-size:10px; color:#999;">(登録: ${formatDateYMDHM(getDt(rec))})</span>`;
+    }
+    return `
     <div class="rec-row">
       <button class="rec-body" onclick="editRec('${rec._cid}','${rec.id}')">
-        <small><span class="cat-tag" style="background:${rec._cc}20; color:${rec._cc}; border:1px solid ${rec._cc}40;">${rec._icon} ${highlight(rec._cn, sRaw)}</span> ${formatDateYMDHM(getDt(rec))}</small>
+        <small><span class="cat-tag" style="background:${rec._cc}20; color:${rec._cc}; border:1px solid ${rec._cc}40;">${rec._icon} ${highlight(rec._cn, sRaw)}</span> ${dateHtml}</small>
         <div style="margin-top: 4px;">
           ${rec._fs.map(f => {
             if (!rec[f.id]) return '';
@@ -4034,7 +4165,8 @@ function renderAnalysisList() {
           }).filter(x => x).join('')}
         </div>
       </button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   
   renderPaginationControls('pagination-anlz', currentPage, totalRecords, "changeAnalysisPage");
 }
