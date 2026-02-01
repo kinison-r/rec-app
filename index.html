@@ -436,6 +436,11 @@
                 <input type="date" id="anlz-end-date" style="margin:0; padding:8px; width:100%;">
             </div>
         </div>
+        <div class="d-flex align-center gap-2" style="background:#f8f9fa; padding: 8px; border-radius: 5px; margin: 0;">
+          <span style="font-size:12px; font-weight:bold; color:#555; width:auto;">並び順:</span>
+          <label style="font-size:13px; cursor:pointer; margin:0; display:flex; align-items:center; gap:4px;"><input type="radio" name="sort-order" value="desc" checked style="width:auto; margin:0;"> 新しい順 (降順)</label>
+          <label style="font-size:13px; cursor:pointer; margin:0; display:flex; align-items:center; gap:4px;"><input type="radio" name="sort-order" value="asc" style="width:auto; margin:0;"> 古い順 (昇順)</label>
+        </div>
       </div>
       <div class="d-flex gap-2">
         <button class="btn-main flex-2" onclick="rAnlz(true, true)" style="margin:0; background:#007bff;">検索</button>
@@ -2861,6 +2866,8 @@ window.clearSearch = function() {
     document.getElementById('anlz-end-date').value = '';
     const andRadio = document.querySelector('input[name="search-mode"][value="and"]');
     if (andRadio) andRadio.checked = true;
+    const sortDesc = document.querySelector('input[name="sort-order"][value="desc"]');
+    if (sortDesc) sortDesc.checked = true;
     rAnlz(true);
   } catch (e) { showCopyableError('検索クリア処理エラー', e.stack); }
 };
@@ -3796,7 +3803,7 @@ function showStockHistory(id) {}
 // ▲▲▲ 追加 ▲▲▲
 
 // 分析・CSV
-function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sortAsc = false) {
+function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sortAsc = null) {
   if (resetPage) {
     st.pagination.analysis = 1;
   }
@@ -3918,10 +3925,57 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sor
     return true;
   });
 
-  if (sortAsc) {
-    filteredRecs.sort((a, b) => getDt(a) - getDt(b));
+  // ソート順決定
+  let isAsc = false;
+  const sortRadioAsc = document.querySelector('input[name="sort-order"][value="asc"]');
+  const sortRadioDesc = document.querySelector('input[name="sort-order"][value="desc"]');
+
+  if (sortAsc !== null) {
+    isAsc = sortAsc;
+    if (isAsc && sortRadioAsc) sortRadioAsc.checked = true;
+    if (!isAsc && sortRadioDesc) sortRadioDesc.checked = true;
   } else {
-    filteredRecs.sort((a, b) => getDt(b) - getDt(a));
+    if (sortRadioAsc && sortRadioAsc.checked) isAsc = true;
+  }
+
+  // ソート用日付取得関数
+  const getSortDate = (rec) => {
+    // 日付フィールドの値を確認
+    const dateFields = rec._fs.filter(f => f.type === 'date');
+    const validDates = [];
+    dateFields.forEach(f => {
+        const val = rec[f.id];
+        if (val) {
+            const d = new Date(val);
+            if (!isNaN(d.getTime())) validDates.push(d);
+        }
+    });
+
+    // 基準日（検索開始日があればそれ、なければ今日）
+    const criterion = startDate ? new Date(startDate) : new Date();
+    criterion.setHours(0, 0, 0, 0);
+
+    // 基準日以降の日付項目があれば、それを優先する
+    const futureDates = validDates.filter(d => {
+        const dCheck = new Date(d);
+        dCheck.setHours(23, 59, 59, 999); // その日の終わりまで含める
+        return dCheck >= criterion;
+    });
+
+    if (futureDates.length > 0) {
+        // 未来の日付の中で最も直近のものを採用
+        futureDates.sort((a, b) => a - b);
+        return futureDates[0];
+    }
+
+    // なければ登録日時を使用
+    return getDt(rec);
+  };
+
+  if (isAsc) {
+    filteredRecs.sort((a, b) => getSortDate(a) - getSortDate(b));
+  } else {
+    filteredRecs.sort((a, b) => getSortDate(b) - getSortDate(a));
   }
 
   analysisRecordsCache = filteredRecs;
