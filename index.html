@@ -2733,7 +2733,7 @@ function searchFutureRecords() {
   document.getElementById('anlz-end-date').value = '';
   document.getElementById('srch').value = '';
   if(document.getElementById('srch-cat')) document.getElementById('srch-cat').value = '';
-  rAnlz(true, true, new Date());
+  rAnlz(true, true, new Date(), true);
 }
 
 function checkForgottenItems() {
@@ -3796,7 +3796,7 @@ function showStockHistory(id) {}
 // ▲▲▲ 追加 ▲▲▲
 
 // 分析・CSV
-function rAnlz(resetPage = false, saveHistory = false, customMinDate = null) {
+function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sortAsc = false) {
   if (resetPage) {
     st.pagination.analysis = 1;
   }
@@ -3918,7 +3918,11 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null) {
     return true;
   });
 
-  filteredRecs.sort((a, b) => getDt(b) - getDt(a));
+  if (sortAsc) {
+    filteredRecs.sort((a, b) => getDt(a) - getDt(b));
+  } else {
+    filteredRecs.sort((a, b) => getDt(b) - getDt(a));
+  }
 
   analysisRecordsCache = filteredRecs;
 
