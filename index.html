@@ -2360,20 +2360,31 @@ function propagateStockCorrection(c, originalRecord, newForm) {
   if (!confirm('在庫数の変更を検出しました。\nこの変更（差分）を、この記録以降のすべての在庫記録に反映（洗い替え）しますか？\n\n※「OK」を押すと、未来の記録の在庫数が自動的に補正されます。')) return;
 
   const targetDate = getDt(originalRecord);
+  const fType = c.fields.find(f => f.name === '在庫区分');
   let count = 0;
 
-  c.records.forEach(r => {
-    if (r.id === originalRecord.id) return; // 自分自身はsaveRecで更新されるのでスキップ
-    if (getDt(r) <= targetDate) return; // 過去または同時の記録は対象外
+  // 未来の記録を抽出して古い順（時系列順）にソート
+  const futureRecs = c.records.filter(r => {
+      if (r.id === originalRecord.id) return false;
+      return getDt(r) > targetDate;
+  }).sort((a, b) => getDt(a) - getDt(b));
 
+  for (const r of futureRecs) {
     const rDrugVal = r[fDrug.id];
     const rStockVal = r[fStock.id];
-    if (!rDrugVal || !rStockVal) return;
+    if (!rDrugVal || !rStockVal) continue;
 
     const rDrugs = rDrugVal.split(/[\s,]+/).filter(d => d);
     // 変更があった薬剤を含む記録かチェック
     const relevantDrugs = rDrugs.filter(d => diffs[d] !== undefined);
-    if (relevantDrugs.length === 0) return;
+    if (relevantDrugs.length === 0) continue;
+
+    // 棚卸チェック: 棚卸の記録があれば、その薬剤の補正はそこで終了（以降の記録には波及させない）
+    if (fType && r[fType.id] === '棚卸') {
+        relevantDrugs.forEach(d => delete diffs[d]);
+        if (Object.keys(diffs).length === 0) break; // 全薬剤の補正が終了したらループ抜け
+        continue;
+    }
 
     const rMap = parseStockValue(rStockVal, rDrugs);
     let modified = false;
@@ -2401,7 +2412,7 @@ function propagateStockCorrection(c, originalRecord, newForm) {
       }
       count++;
     }
-  });
+  }
   
   if (count > 0) {
       showToast(`${count}件の未来の記録を補正しました`);
