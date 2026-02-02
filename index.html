@@ -27,10 +27,32 @@
       font-family: sans-serif;
       -webkit-tap-highlight-color: transparent;
     }
+    /* ▼▼▼ 追加: テーマ用CSS変数 ▼▼▼ */
+    :root {
+      --bg-body: #f0f2f5;
+      --text-main: #333;
+      --text-sub: #666;
+      --bg-card: #fff;
+      --bg-input: #fcfcfc;
+      --border-color: #ddd;
+      --nav-bg: #f0f2f5;
+    }
+    body.dark-mode {
+      --bg-body: #121212;
+      --text-main: #e0e0e0;
+      --text-sub: #aaa;
+      --bg-card: #1e1e1e;
+      --bg-input: #2d2d2d;
+      --border-color: #444;
+      --nav-bg: #1e1e1e;
+    }
+    /* ▲▲▲ 追加 ▲▲▲ */
     body {
       background: #8b67f7;
+      background: var(--bg-body);
       padding-bottom: 80px;
       color: #333;
+      color: var(--text-main);
       line-height: 1.4;
     }
     .container {
@@ -72,11 +94,14 @@
     
     .card {
       background: #fff;
+      background: var(--bg-card);
       padding: 15px;
       margin-bottom: 12px;
       border-radius: 12px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      border: 1px solid transparent; /* ダークモード時の境界線用プレースホルダ */
     }
+    body.dark-mode .card { border-color: var(--border-color); }
     .nav {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -88,6 +113,7 @@
       width: 100%;
       max-width: 600px;
       background: #f0f2f5;
+      background: var(--nav-bg);
       padding: 5px 10px;
       z-index: 1000;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
@@ -114,20 +140,26 @@
       border: 2px solid #007bff;
       border-radius: 10px;
       background: #fff;
+      background: var(--bg-card);
+      color: var(--text-main);
       margin-bottom: 15px;
       font-weight: bold;
     }
     #sel-in {
       background: rgba(255, 255, 255, 0.3);
     }
+    body.dark-mode #sel-in { background: rgba(255, 255, 255, 0.1); color: #fff; }
     input, select, textarea {
       width: 100%;
       padding: 12px;
       margin: 5px 0;
       border: 1px solid #ddd;
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       font-size: 16px;
       background: #fcfcfc;
+      background: var(--bg-input);
+      color: var(--text-main);
       overflow-y: hidden; /* 自動調整のためスクロールバー非表示 */
     }
     .btn-main {
@@ -152,10 +184,12 @@
     }
     .rec-row {
       background: #fff;
+      background: var(--bg-card);
       margin-top: 5px;
       display: flex;
       border-radius: 8px;
       border-bottom: 1px solid #eee;
+      border-bottom: 1px solid var(--border-color);
       overflow: hidden;
     }
     .rec-body {
@@ -164,6 +198,7 @@
       text-align: left;
       border: none;
       background: none;
+      color: var(--text-main);
       cursor: pointer;
     }
     .del-btn {
@@ -207,6 +242,7 @@
       font-size: 11px;
       font-weight: bold;
       color: #666;
+      color: var(--text-sub);
       margin-top: 8px;
     }
     .section-title {
@@ -624,6 +660,16 @@
       <h2 class="section-title">保守・管理</h2>
       
       <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
+        <summary style="font-weight:bold; cursor:pointer;">表示設定</summary>
+        <div class="mt-2">
+          <label style="display:flex; align-items:center; font-size:14px;">
+            <input type="checkbox" id="dark-mode-switch" onchange="toggleDarkMode(this.checked)" style="width:auto; height:18px; width:18px; margin-right:10px;">
+            ダークモードを有効にする
+          </label>
+        </div>
+      </details>
+
+      <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
         <summary style="font-weight:bold; cursor:pointer;">カテゴリー管理</summary>
         <div class="mt-2">
           <h3 id="title-c" style="font-size:14px; margin-bottom:5px;">カテゴリー追加</h3>
@@ -949,12 +995,59 @@
 <button id="scroll-to-save-btn" class="scroll-to-save-btn" onclick="scrollToSave()">▼</button>
 
 <script>
+// ▼▼▼ 追加: コンソールログのキャプチャ（スマホデバッグ用） ▼▼▼
+(function(){
+    const oldLog = console.log;
+    console.log = function(...args) {
+        oldLog.apply(console, args);
+        if(st && st.debugLogs) {
+            const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+            st.debugLogs.unshift(`[${new Date().toLocaleTimeString()}] ${msg}`);
+            if(st.debugLogs.length > 50) st.debugLogs.length = 50;
+        }
+    };
+})();
+// ▲▲▲ 追加 ▲▲▲
+
 // ★ バージョン管理 ★
 const VERSION = "v7.9.1";
 const KEY = 'action_app_' + VERSION + '_data';
 const KEY_EXT = KEY + '_ext';
 const KEY_LOGS = KEY + '_logs';
 const KEY_SETTINGS = KEY + '_settings';
+
+// ▼▼▼ 追加: グローバル変数定義 ▼▼▼
+let st = {
+  view: 'input',
+  cur: null,
+  cats: [],
+  stock: [],
+  settings: {},
+  form: {},
+  editR: null,
+  saveMode: null,
+  editCat: null,
+  editF: null,
+  ioLogs: [],
+  extFiles: [],
+  extData: [],
+  extCurrentIdx: -1,
+  extSelectedItems: [],
+  extFileName: null,
+  extFileDate: null,
+  extGraphMode: 0,
+  extTableSort: { col: 'date', asc: false },
+  analysisSelection: new Set(),
+  pagination: { input: {}, analysis: 1 },
+  debugLogs: []
+};
+let analysisRecordsCache = [];
+const RECS_PER_PAGE = 20;
+let backupCounter = 0;
+let graphUpdateTimer = null;
+let navHideTimer = null;
+let navScrollListener = null;
+// ▲▲▲ 追加 ▲▲▲
 
 // ▼▼▼ 追加: 定数 ▼▼▼
 const CAT_ID_TOILET = 'cat_other';
@@ -1067,31 +1160,6 @@ function getDeviceType() {
   }
   return "pc";
 }
-// ▲▲▲ 追加 ▲▲▲
-
-let st = { cats: [], stock: [], cur: null, view: 'input', editR: null, editF: null, editCat: null, form: {}, ioLogs: [], debugLogs: [], extFiles: [], extCurrentIdx: -1, extData: [], extFileName: null, extFileDate: null, settings: { realtimeBackup: false, graphHeight: 360, graphLineColor: '#007bff', graphLineWidth: 3, graphMaLineColor: '#ff9800', graphMaLineWidth: 3, graphLatestLineColor: '#ff0000', graphLatestLineWidth: 1, graphDataFontSize: 10, graphAxisFontSize: 10, graphTitleFontSize: 14, graphMinLabelSpacing: 8, graphXAxisInterval: 'auto', waterTarget: 1500, imageMaxWidth: 800, imageQuality: 80, searchHistory: [], searchNotHistory: [], graphMarkerShow: true, graphMarkerSize: 4, searchHistoryCount: 5 }, extSelectedItems: [], extGraphMode: 0, analysisSelection: new Set() };
-const RECS_PER_PAGE = 20;
-let analysisRecordsCache = [];
-let backupCounter = 0;
-st.pagination = { input: {}, analysis: 1 };
-// ▼▼▼ 追加: グラフ表示時のナビゲーション制御用 ▼▼▼
-let navHideTimer = null;
-let navScrollListener = null;
-let graphUpdateTimer = null;
-window.myExtCharts = [];
-
-// ▼▼▼ 追加: コンソールログのキャプチャ（スマホデバッグ用） ▼▼▼
-(function(){
-    const oldLog = console.log;
-    console.log = function(...args) {
-        oldLog.apply(console, args);
-        if(st && st.debugLogs) {
-            const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-            st.debugLogs.unshift(`[${new Date().toLocaleTimeString()}] ${msg}`);
-            if(st.debugLogs.length > 50) st.debugLogs.length = 50;
-        }
-    };
-})();
 // ▲▲▲ 追加 ▲▲▲
 
 // ★ カテゴリー色設定 ★
@@ -1256,6 +1324,17 @@ function updateBackupFrequency(val) {
   st.settings.backupFrequency = v;
   document.getElementById('backup-freq-value').innerText = v;
   saveSettings();
+}
+
+function toggleDarkMode(isChecked) {
+  if (!st.settings) st.settings = {};
+  st.settings.darkMode = isChecked;
+  applyTheme();
+  saveSettings();
+}
+
+function applyTheme() {
+  document.body.classList.toggle('dark-mode', !!(st.settings && st.settings.darkMode));
 }
 
 function updateGraphSetting(key, value) {
@@ -1494,7 +1573,7 @@ function v(name) {
   r();
 }
 
-function r() {
+function r()  {
   // 読み込み完了したらローディング表示を消す
   const loader = document.getElementById('loading-msg');
   if(loader) loader.style.display = 'none';
@@ -1503,8 +1582,8 @@ function r() {
   document.title = "行動ログ " + VERSION;
   document.getElementById('ver-tag').innerText = VERSION;
 
-  // 背景色リセット
-  document.body.style.background = '#f0f2f5';
+  // 背景色リセット (CSS変数に任せるためインラインスタイル削除)
+  document.body.style.background = '';
 
   ['input', 'search', 'analysis', 'maint'].forEach(n => {
     document.getElementById('s-' + n).style.display = (st.view === n ? 'block' : 'none');
@@ -1513,8 +1592,8 @@ function r() {
   const c = st.cats.find(x => x.id === st.cur) || st.cats[0];
   if (c) st.cur = c.id;
 
-  // 記録画面の場合、カテゴリー色を背景に薄く適用
-  if (st.view === 'input' && c && c.color && /^#[0-9A-Fa-f]{6}$/.test(c.color)) {
+  // 記録画面の場合、カテゴリー色を背景に薄く適用 (ダークモード時は適用しない)
+  if (st.view === 'input' && c && c.color && /^#[0-9A-Fa-f]{6}$/.test(c.color) && !(st.settings && st.settings.darkMode)) {
     const h = c.color;
     const r = parseInt(h.slice(1,3), 16), g = parseInt(h.slice(3,5), 16), b = parseInt(h.slice(5,7), 16);
     document.body.style.background = `rgba(${r},${g},${b},0.15)`;
@@ -1603,6 +1682,10 @@ function r() {
     const backupSwitch = document.getElementById('realtime-backup-switch');
     if (backupSwitch) {
       backupSwitch.checked = !!(st.settings && st.settings.realtimeBackup);
+    }
+    const darkModeSwitch = document.getElementById('dark-mode-switch');
+    if (darkModeSwitch) {
+      darkModeSwitch.checked = !!(st.settings && st.settings.darkMode);
     }
     const backupFreqSlider = document.getElementById('backup-freq-slider');
     if (backupFreqSlider) {
@@ -2357,17 +2440,28 @@ function propagateStockCorrection(c, originalRecord, newForm) {
 
   if (!hasDiff) return;
 
-  if (!confirm('在庫数の変更を検出しました。\nこの変更（差分）を、この記録以降のすべての在庫記録に反映（洗い替え）しますか？\n\n※「OK」を押すと、未来の記録の在庫数が自動的に補正されます。')) return;
-
   const targetDate = getDt(originalRecord);
-  const fType = c.fields.find(f => f.name === '在庫区分');
-  let count = 0;
 
   // 未来の記録を抽出して古い順（時系列順）にソート
   const futureRecs = c.records.filter(r => {
       if (r.id === originalRecord.id) return false;
       return getDt(r) > targetDate;
   }).sort((a, b) => getDt(a) - getDt(b));
+
+  // 補正対象となる未来の記録が実際に存在するかチェック
+  const hasFutureTarget = futureRecs.some(r => {
+      const rDrugVal = r[fDrug.id];
+      if (!rDrugVal) return false;
+      const rDrugs = rDrugVal.split(/[\s,]+/).filter(d => d);
+      return rDrugs.some(d => diffs[d] !== undefined);
+  });
+
+  if (!hasFutureTarget) return;
+
+  if (!confirm('在庫数の変更を検出しました。\nこの変更（差分）を、この記録以降のすべての在庫記録に反映（洗い替え）しますか？\n\n※「OK」を押すと、未来の記録の在庫数が自動的に補正されます。')) return;
+
+  const fType = c.fields.find(f => f.name === '在庫区分');
+  let count = 0;
 
   for (const r of futureRecs) {
     const rDrugVal = r[fDrug.id];
@@ -2870,7 +2964,7 @@ function searchFutureRecords() {
   document.getElementById('anlz-end-date').value = '';
   document.getElementById('srch').value = '';
   if(document.getElementById('srch-cat')) document.getElementById('srch-cat').value = '';
-  rAnlz(true, true, new Date(), true);
+  rAnlz(true, true, new Date(), true, true);
 }
 
 function checkForgottenItems() {
@@ -3935,10 +4029,10 @@ function showStockHistory(id) {}
 // ▲▲▲ 追加 ▲▲▲
 
 // 分析・CSV
-function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sortAsc = null) {
-  if (resetPage) {
-    st.pagination.analysis = 1;
-  }
+function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sortAsc = null, excludeNextVisit = false) {
+   if (resetPage) {
+     st.pagination.analysis = 1;
+   }
 
   const sRaw = document.getElementById('srch').value.trim();
   const sNotRaw = document.getElementById('srch-not') ? document.getElementById('srch-not').value.trim() : '';
@@ -4008,6 +4102,7 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sor
         // 登録日が範囲外でも、日付フィールド(type='date')が範囲内なら対象とする
         const dateFields = rec._fs.filter(f => f.type === 'date');
         for (const f of dateFields) {
+          if (excludeNextVisit && f.name && f.name.includes('次回通院日')) continue;
           const val = rec[f.id];
           if (val) {
             const d = new Date(val);
@@ -4079,6 +4174,7 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sor
     const dateFields = rec._fs.filter(f => f.type === 'date');
     const validDates = [];
     dateFields.forEach(f => {
+        if (excludeNextVisit && f.name && f.name.includes('次回通院日')) return;
         const val = rec[f.id];
         if (val) {
             const d = new Date(val);
@@ -5972,22 +6068,6 @@ async function exportAnalysisCSV() {
   if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 
-function getRefRange(ref) {
-  if (!ref) return null;
-  let min = null, max = null;
-  // 全角チルダ「～」に対応
-  const range = ref.match(/([\d\.]+)\s*[\-~～]\s*([\d\.]+)/);
-  if (range) {
-    min = parseFloat(range[1]); max = parseFloat(range[2]);
-  } else {
-    if (ref.match(/(?:以下|<=|=<)\s*([\d\.]+)/)) max = parseFloat(RegExp.$1);
-    if (ref.match(/(?:以上|>=|=>)\s*([\d\.]+)/)) min = parseFloat(RegExp.$1);
-    if (ref.match(/([\d\.]+)\s*(?:=<|<=)/)) min = parseFloat(RegExp.$1);
-  }
-  // 片方しかなくてもオブジェクトを返す
-  if (min === null && max === null) return null;
-  return { min, max };
-}
 
 window.cycleGraphMode = function() {
   if (st.extGraphMode === undefined) st.extGraphMode = 0;
@@ -6805,6 +6885,7 @@ async function resetApp() {
       if(stk) st.stock = stk;
       const s = await idb.get(KEY_SETTINGS);
       if(s) st.settings = {...st.settings, ...s};
+      applyTheme(); // テーマ適用
     } catch(e){}
 
     // ▼▼▼ 追加: テキスト候補のデータ形式移行 ▼▼▼
@@ -7006,7 +7087,7 @@ async function resetApp() {
     if (eEl && !eEl.value) eEl.value = eStr;
   });
   // ▲▲▲ 追加 ▲▲▲
-})();
+})(); // init end
 
 // ▼▼▼ 追加: アプリ概要表示 ▼▼▼
 function showAppSummary() {
