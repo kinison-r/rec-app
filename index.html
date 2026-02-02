@@ -790,7 +790,7 @@
             <label style="font-size:13px; cursor:pointer;"><input type="radio" name="json-import-mode" value="merge"> 追加(マージ)</label>
           </div>
           <button class="btn-main" style="background:#dc3545; margin-top:10px;" onclick="document.getElementById('file-ptr').click()">＋ JSONファイル取込</button>
-          <input type="file" id="file-ptr" accept=".json" style="display:none;" onchange="importJSON(this)">
+          <input type="file" id="file-ptr" accept=".json,.zip" style="display:none;" onchange="importJSON(this)">
           
           <div style="margin-top:15px; border-top:1px dashed #ddd; padding-top:5px;">
             <div style="font-size:12px; font-weight:bold; color:#666; margin-bottom:5px;">入出力履歴 (過去48時間)</div>
@@ -1449,8 +1449,12 @@ async function realtimeBackup() {
       extFiles: st.extFiles || []
     };
     const jsonStr = JSON.stringify(data, jsonJstReplacer, 2);
-    const blob = new Blob([jsonStr], {type:'application/json'});
-    const filename = '行動ログ６１０リアルバックアップ.json';
+
+    if (!window.JSZip) throw new Error('JSZipライブラリが読み込まれていません');
+    const zip = new JSZip();
+    zip.file('行動ログ６１０リアルバックアップ.json', jsonStr);
+    const blob = await zip.generateAsync({type:'blob', mimeType:'application/zip', compression:'DEFLATE', compressionOptions:{level:6}});
+    const filename = '行動ログ６１０リアルバックアップ.zip';
 
     // saveBlobに任せる（ディレクトリ設定があればそこに上書きされる）
     await saveBlob(blob, filename);
@@ -3341,7 +3345,7 @@ function getStockData() {
     sortedRecs.forEach(r => {
       const drugVal = r[fDrug.id];
       const stockVal = r[fStock.id];
-      if (!drugVal || !stockVal) return;
+      if (!drugVal || stockVal === undefined || stockVal === null || stockVal === '') return;
 
       // 薬剤名のリスト化 (スペース区切り等)
       const drugs = drugVal.split(/[\s,]+/).filter(d => d);
@@ -3358,16 +3362,17 @@ function getStockData() {
 
         // 在庫数のパース
         let qty = null;
+        const sStockVal = String(stockVal);
         // "薬A:10 薬B:20" 形式のチェック
         const escapedName = drugName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         // 正規表現: 名前 + 区切り文字(:=) + 数値
-        const match = stockVal.match(new RegExp(`${escapedName}\\s*[:=]\\s*(-?\\d+(\\.\\d+)?)`));
+        const match = sStockVal.match(new RegExp(`${escapedName}\\s*[:=]\\s*(-?\\d+(\\.\\d+)?)`));
         
         if (match) {
           qty = parseFloat(match[1]);
-        } else if (drugs.length === 1 && /^-?\d+(\.\d+)?$/.test(stockVal)) {
+        } else if (drugs.length === 1 && /^-?\d+(\.\d+)?$/.test(sStockVal)) {
           // 薬剤が1つだけで、在庫数が数値のみの場合
-          qty = parseFloat(stockVal);
+          qty = parseFloat(sStockVal);
         }
 
         if (qty !== null) {
@@ -3668,6 +3673,7 @@ function rStock() {
       </div>
 
       <div style="margin-top:10px; text-align:right;">
+        <button class="btn-sub" onclick="showStockHistory('${safeName}')" style="background:#17a2b8; color:white; margin-right:5px;">履歴</button>
         <button class="btn-sub" onclick="deleteStockItem('${esc(item.name)}')" style="background:#dc3545;">削除</button>
       </div>
     </div>`;
@@ -4025,7 +4031,60 @@ function renderDebugLogs() {
 function editStockItem(id) {}
 function saveStockItemFromModal() {}
 function changeStock(id, delta, type) {}
-function showStockHistory(id) {}
+function showStockHistory(name) {
+  const history = [];
+  st.cats.forEach(c => {
+    const fDrug = c.fields.find(f => f.name === '薬剤');
+    const fType = c.fields.find(f => f.name === '在庫区分');
+    const fAmount = c.fields.find(f => f.name === '登録数');
+    const fStock = c.fields.find(f => f.name === '帳簿在庫数');
+    
+    if (!fDrug) return;
+
+    c.records.forEach(r => {
+      const rDrug = r[fDrug.id];
+      if (rDrug && String(rDrug).includes(name)) {
+        const dt = getDt(r);
+        const type = fType ? (r[fType.id] || '-') : '-';
+        const amount = fAmount ? (r[fAmount.id] || '') : '';
+        let stockVal = '';
+        
+        if (fStock && r[fStock.id]) {
+           const rStockVal = String(r[fStock.id]);
+           const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+           const match = rStockVal.match(new RegExp(`${escapedName}\\s*[:=]\\s*(-?\\d+(\\.\\d+)?)`));
+           if (match) {
+             stockVal = match[1];
+           } else if (!rStockVal.includes(':') && !rStockVal.includes('=')) {
+             if (/^-?\d+(\.\d+)?$/.test(rStockVal)) stockVal = rStockVal;
+           }
+        }
+        
+        history.push({ dt: dt, catName: c.name, type: type, amount: amount, stock: stockVal, cid: c.id, rid: r.id });
+      }
+    });
+  });
+
+  history.sort((a, b) => b.dt - a.dt);
+
+  let html = `<div style="max-height:60vh; overflow-y:auto;"><table style="width:100%; border-collapse:collapse; font-size:12px;">
+    <thead style="position:sticky; top:0; background:#f0f0f0; z-index:1;">
+      <tr><th style="border:1px solid #ddd; padding:5px;">日時</th><th style="border:1px solid #ddd; padding:5px;">区分</th><th style="border:1px solid #ddd; padding:5px;">数量</th><th style="border:1px solid #ddd; padding:5px;">在庫</th><th style="border:1px solid #ddd; padding:5px;">操作</th></tr>
+    </thead><tbody>`;
+  
+  if (history.length === 0) {
+    html += `<tr><td colspan="5" style="padding:10px; text-align:center;">履歴なし</td></tr>`;
+  } else {
+    history.forEach(h => {
+      html += `<tr><td style="border:1px solid #ddd; padding:5px;">${formatDateYMDHM(h.dt)}<br><span style="font-size:10px; color:#666;">${esc(h.catName)}</span></td><td style="border:1px solid #ddd; padding:5px; text-align:center;">${esc(h.type)}</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${esc(h.amount)}</td><td style="border:1px solid #ddd; padding:5px; text-align:right; font-weight:bold;">${esc(h.stock)}</td><td style="border:1px solid #ddd; padding:5px; text-align:center;"><button class="btn-sub" onclick="closeModal(); editRec('${h.cid}','${h.rid}')">編集</button></td></tr>`;
+    });
+  }
+  html += `</tbody></table></div>`;
+
+  document.getElementById('modal-title').innerText = `「${esc(name)}」の使用履歴`;
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
 // ▲▲▲ 追加 ▲▲▲
 
 // 分析・CSV
@@ -4413,24 +4472,29 @@ async function expCSVSplit() {
   if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 async function expJSON() {
+  if (!window.JSZip) { alert('JSZipライブラリが読み込まれていません。'); return; }
   const mode = document.getElementById('csv-sel').value;
   let data;
-  let name;
+  let jsonName;
   const ts = getTS();
 
   if(mode === 'all') {
     // 全件出力時は、在庫・設定含むフルバックアップ形式にする
     data = { format: 'full_backup', version: VERSION, cats: st.cats, stock: st.stock || [], settings: st.settings || {}, extFiles: st.extFiles || [] };
-    name = `${VERSION}_${ts}_action_all_full.json`;
+    jsonName = `${VERSION}_${ts}_action_all_full.json`;
   } else {
     // 個別出力は従来通りカテゴリー配列（または単体）
     const c = st.cats.find(x=>x.id===mode);
     data = c ? [c] : [];
-    name = `${VERSION}_${ts}_action_${c ? c.name : 'unknown'}.json`;
+    jsonName = `${VERSION}_${ts}_action_${c ? c.name : 'unknown'}.json`;
   }
 
-  const blob = new Blob([JSON.stringify(data, jsonJstReplacer, 2)], {type:'application/json'});
-  if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
+  const zip = new JSZip();
+  zip.file(jsonName, JSON.stringify(data, jsonJstReplacer, 2));
+  const blob = await zip.generateAsync({type:'blob', compression:'DEFLATE'});
+  const zipName = jsonName.replace('.json', '.zip');
+
+  if(await saveBlob(blob, zipName)) { addIoLog('export', zipName, true); showToast('保存しました: ' + zipName); }
 }
 async function expImages() {
   if (!window.JSZip) { alert('JSZipライブラリが読み込まれていません。'); return; }
@@ -6695,132 +6759,141 @@ async function reqPersist() {
 }
 
 // データ取込・整理
-function importJSON(input) {
+async function importJSON(input) {
   if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
   input.disabled = true;
   document.body.style.cursor = 'wait';
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const content = e.target.result;
-      if (!content || !content.trim()) {
-        throw new Error('ファイルが空です。正しいJSONファイルを選択してください。');
-      }
-      const json = JSON.parse(content);
-      const mode = document.querySelector('input[name="json-import-mode"]:checked').value;
 
-      let newCats = [];
-      let newStock = [];
-      let newSettings = null;
-      let newExtFiles = [];
+  try {
+    let content = '';
+    if (file.name.toLowerCase().endsWith('.zip')) {
+      if (!window.JSZip) throw new Error('JSZipライブラリが読み込まれていません。');
+      const zip = await JSZip.loadAsync(file);
+      // JSONファイルを探す (隠しファイルなどは除外)
+      const jsonFile = Object.values(zip.files).find(f => !f.dir && f.name.toLowerCase().endsWith('.json') && !f.name.startsWith('__MACOSX'));
+      if (!jsonFile) throw new Error('ZIPファイル内にJSONファイルが見つかりませんでした。');
+      content = await jsonFile.async('string');
+    } else {
+      content = await file.text();
+    }
 
-      // フォーマット判定
-      if (json.format === 'full_backup' || (json.cats && Array.isArray(json.cats))) {
-        // 新形式 (フルバックアップ)
-        newCats = json.cats || [];
-        newStock = json.stock || [];
-        newSettings = json.settings || null;
-        newExtFiles = json.extFiles || [];
-      } else if (Array.isArray(json)) {
-        // 旧形式 (カテゴリー配列)
-        newCats = json;
-      } else if (json.id && json.name) {
-        // 旧形式 (単体カテゴリー)
-        newCats = [json];
-      }
+    if (!content || !content.trim()) {
+      throw new Error('ファイルが空です。正しいJSONファイルを選択してください。');
+    }
+    const json = JSON.parse(content);
+    const mode = document.querySelector('input[name="json-import-mode"]:checked').value;
 
-      if (mode === 'merge') {
-        let addCat = 0, addRec = 0;
-        newCats.forEach(src => {
-          const dst = st.cats.find(c => c.id === src.id);
-          if (dst) {
-            // カテゴリが存在する場合、フィールドと記録をマージ
-            if (src.fields) {
-              src.fields.forEach(sf => {
-                if (!dst.fields.find(df => df.id === sf.id)) dst.fields.push(sf);
-              });
-            }
-            // ルールのマージ
-            if (src.rules && Array.isArray(src.rules)) {
-              if (!dst.rules) dst.rules = [];
-              src.rules.forEach(r => {
-                if (!dst.rules.includes(r)) dst.rules.push(r);
-              });
-            }
-            if (src.records) {
-              src.records.forEach(sr => {
-                if (!dst.records.find(dr => dr.id === sr.id)) {
-                  dst.records.push(sr);
-                  addRec++;
-                }
-              });
-              dst.records.sort((a, b) => getDt(b) - getDt(a));
-            }
-          } else {
-            // カテゴリが存在しない場合、丸ごと追加
-            st.cats.push(src);
-            addCat++;
-            if (src.records) addRec += src.records.length;
+    let newCats = [];
+    let newStock = [];
+    let newSettings = null;
+    let newExtFiles = [];
+
+    // フォーマット判定
+    if (json.format === 'full_backup' || (json.cats && Array.isArray(json.cats))) {
+      // 新形式 (フルバックアップ)
+      newCats = json.cats || [];
+      newStock = json.stock || [];
+      newSettings = json.settings || null;
+      newExtFiles = json.extFiles || [];
+    } else if (Array.isArray(json)) {
+      // 旧形式 (カテゴリー配列)
+      newCats = json;
+    } else if (json.id && json.name) {
+      // 旧形式 (単体カテゴリー)
+      newCats = [json];
+    }
+
+    if (mode === 'merge') {
+      let addCat = 0, addRec = 0;
+      newCats.forEach(src => {
+        const dst = st.cats.find(c => c.id === src.id);
+        if (dst) {
+          // カテゴリが存在する場合、フィールドと記録をマージ
+          if (src.fields) {
+            src.fields.forEach(sf => {
+              if (!dst.fields.find(df => df.id === sf.id)) dst.fields.push(sf);
+            });
+          }
+          // ルールのマージ
+          if (src.rules && Array.isArray(src.rules)) {
+            if (!dst.rules) dst.rules = [];
+            src.rules.forEach(r => {
+              if (!dst.rules.includes(r)) dst.rules.push(r);
+            });
+          }
+          if (src.records) {
+            src.records.forEach(sr => {
+              if (!dst.records.find(dr => dr.id === sr.id)) {
+                dst.records.push(sr);
+                addRec++;
+              }
+            });
+            dst.records.sort((a, b) => getDt(b) - getDt(a));
+          }
+        } else {
+          // カテゴリが存在しない場合、丸ごと追加
+          st.cats.push(src);
+          addCat++;
+          if (src.records) addRec += src.records.length;
+        }
+      });
+      
+      // 在庫のマージ
+      if (newStock.length > 0) {
+        if (!st.stock) st.stock = [];
+        const existingNames = new Set(st.stock.map(s => s.name));
+        newStock.forEach(s => {
+          if (!existingNames.has(s.name)) {
+            st.stock.push(s);
           }
         });
-        
-        // 在庫のマージ
-        if (newStock.length > 0) {
-          if (!st.stock) st.stock = [];
-          const existingNames = new Set(st.stock.map(s => s.name));
-          newStock.forEach(s => {
-            if (!existingNames.has(s.name)) {
-              st.stock.push(s);
-            }
-          });
-        }
-        
-        // 設定のマージ (ファイル側を優先して上書き)
-        if (newSettings) {
-          st.settings = { ...st.settings, ...newSettings };
-          console.log('Settings merged.');
-        }
-        
-        // 外部データのマージ
-        if (newExtFiles.length > 0) {
-          if (!st.extFiles) st.extFiles = [];
-          newExtFiles.forEach(nf => {
-            const idx = st.extFiles.findIndex(ef => ef.name === nf.name);
-            if (idx >= 0) st.extFiles[idx] = nf; // 上書き
-            else st.extFiles.push(nf);
-          });
-          saveExtData();
-        }
-
-        alert(`マージ完了 (カテゴリ+${addCat}, 記録+${addRec})`);
-      } else {
-        if (!confirm('現在のデータを全て削除して上書きしますか？\nこの操作は取り消せません。')) return;
-        st.cats = newCats;
-        if (newStock.length > 0) st.stock = newStock;
-        if (newSettings) st.settings = newSettings;
-        if (newExtFiles.length > 0) {
-          st.extFiles = newExtFiles;
-          st.extCurrentIdx = -1;
-          saveExtData();
-        }
-        alert("上書き完了");
+      }
+      
+      // 設定のマージ (ファイル側を優先して上書き)
+      if (newSettings) {
+        st.settings = { ...st.settings, ...newSettings };
+        console.log('Settings merged.');
+      }
+      
+      // 外部データのマージ
+      if (newExtFiles.length > 0) {
+        if (!st.extFiles) st.extFiles = [];
+        newExtFiles.forEach(nf => {
+          const idx = st.extFiles.findIndex(ef => ef.name === nf.name);
+          if (idx >= 0) st.extFiles[idx] = nf; // 上書き
+          else st.extFiles.push(nf);
+        });
+        saveExtData();
       }
 
-      save(true);
-      addIoLog('import', input.files[0].name, true);
-      r();
-      alert("完了");
-    } catch (err) {
-      console.error(err);
-      const errorDetails = `メッセージ: ${err.message}\nエラー名: ${err.name}\n\nスタックトレース:\n${err.stack || 'N/A'}`;
-      showCopyableError('ファイル読込エラー', errorDetails);
-    } finally {
-      input.disabled = false;
-      document.body.style.cursor = 'default';
-      input.value = '';
+      alert(`マージ完了 (カテゴリ+${addCat}, 記録+${addRec})`);
+    } else {
+      if (!confirm('現在のデータを全て削除して上書きしますか？\nこの操作は取り消せません。')) return;
+      st.cats = newCats;
+      if (newStock.length > 0) st.stock = newStock;
+      if (newSettings) st.settings = newSettings;
+      if (newExtFiles.length > 0) {
+        st.extFiles = newExtFiles;
+        st.extCurrentIdx = -1;
+        saveExtData();
+      }
+      alert("上書き完了");
     }
-  };
-  reader.readAsText(input.files[0]);
+
+    save(true);
+    addIoLog('import', file.name, true);
+    r();
+    alert("完了");
+  } catch (err) {
+    console.error(err);
+    const errorDetails = `メッセージ: ${err.message}\nエラー名: ${err.name}\n\nスタックトレース:\n${err.stack || 'N/A'}`;
+    showCopyableError('ファイル読込エラー', errorDetails);
+  } finally {
+    input.disabled = false;
+    document.body.style.cursor = 'default';
+    input.value = '';
+  }
 }
 async function clean() {
   const ds = document.getElementById('cl-date').value;
