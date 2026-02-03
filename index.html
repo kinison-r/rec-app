@@ -3172,7 +3172,7 @@ function estimateDailyFrequency(text) {
   if (match) return parseInt(match[1]);
 
   // 慣用句
-  if (t.match(/朝昼夕晩/)) return 4;
+  if (t.match(/朝昼夕晩|朝昼夕夜/)) return 4;
   if (t.match(/(朝昼夕|朝昼晩|毎食)/)) return 3;
   if (t.match(/(朝夕|朝晩)/)) return 2;
   if (t.match(/(寝る前|起床|朝|昼|夕|晩)/)) return 1; 
@@ -4158,8 +4158,8 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sor
     // ▼▼▼ 変更: 開始日判定の拡張 (登録日 or 日付項目) ▼▼▼
     if (startDate) {
       let hit = (recDate >= startDate);
-      if (!hit) {
-        // 登録日が範囲外でも、日付フィールド(type='date')が範囲内なら対象とする
+      // excludeNextVisitがtrue（クイック検索）の場合のみ、日付フィールドも検索対象に含める
+      if (!hit && excludeNextVisit) {
         const dateFields = rec._fs.filter(f => f.type === 'date');
         for (const f of dateFields) {
           if (excludeNextVisit && f.name && f.name.includes('次回通院日')) continue;
