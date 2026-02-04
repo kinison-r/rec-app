@@ -3434,6 +3434,8 @@ function getStockData() {
         item.dailyDose = estimateDailyDose(item.remarks);
     }
 
+    item.originalQty = item.qty; // 元の在庫数を保存
+
     // 当日服用分をマイナスして表示する（次回処方調整用）
     if (item.dailyDose > 0) {
         item.qty = item.qty - item.dailyDose;
@@ -3673,6 +3675,10 @@ function rStock() {
         </div>
         <div style="text-align:right;">
           <div style="font-size:24px; font-weight:bold; color:${color};">${item.qty}</div>
+          ${ (item.originalQty !== item.qty)
+            ? `<div style="font-size:11px; color:var(--text-sub); text-align:right;">(元在庫: ${item.originalQty})</div>`
+            : ''
+          }
         </div>
       </div>
       ${hospitalInfo}
