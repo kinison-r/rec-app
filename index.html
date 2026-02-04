@@ -39,6 +39,7 @@
       --bg-tag: #f1f3f5;
       --text-tag: #495057;
       --text-tag-b: #212529;
+      --bg-hover: #e2e6ea;
     }
     body.dark-mode {
       --bg-body: #000000;      /* 背景をより黒くしてコントラスト向上 */
@@ -48,9 +49,10 @@
       --bg-input: #2c2c2e;     /* 入力欄の背景 */
       --border-color: #3a3a3c; /* 境界線 */
       --nav-bg: #1c1c1e;       /* ナビゲーション */
-      --bg-tag: #333333;       /* 項目タグの背景を暗く */
+      --bg-tag: rgba(255, 255, 255, 0.05); /* 項目タグ・ボタン背景を目立たなく */
       --text-tag: #e0e0e0;     /* 項目タグの文字色 */
       --text-tag-b: #ffffff;   /* 項目タグの太字色 */
+      --bg-hover: rgba(255, 255, 255, 0.15);
     }
     /* ▲▲▲ 追加 ▲▲▲ */
     body {
@@ -219,6 +221,24 @@
       border-radius: 6px; /* 角を少し丸める */
       margin-right: 5px;  /* 右端に少し余白を作る */
     }
+    /* ▼▼▼ 追加: 選択肢ボタン用スタイル ▼▼▼ */
+    .option-btn {
+      background: var(--bg-tag) !important;
+      color: var(--text-main) !important;
+      border: 1px solid var(--border-color);
+      transition: background-color 0.2s;
+    }
+    .option-btn:hover {
+      background: var(--bg-hover) !important;
+    }
+    .option-btn.selected-btn {
+      background: #007bff !important;
+      color: #fff !important;
+    }
+    .option-btn.selected-btn:hover {
+      background: #0056b3 !important;
+    }
+    /* ▲▲▲ 追加 ▲▲▲ */
     .cat-tag {
       background: #cfe2ff;
       color: #084298;
@@ -1655,11 +1675,11 @@ function r()  {
     if(area) {
       if(history.length > 0) {
         let h = `<div style="margin-bottom: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
-        h += `<label style="font-size:10px; color:#888;">履歴から入力:</label>`;
+            h += `<label style="font-size:10px; color:var(--text-sub);">履歴から入力:</label>`;
         h += `<div style="display:flex; overflow-x:auto; gap:5px; margin-top:5px; padding-bottom:5px; -webkit-overflow-scrolling: touch; max-width:100%;">`;
         const historyCount = st.settings.searchHistoryCount || 5;
         history.slice(0, historyCount).forEach(item => {
-          h += `<button class="btn-sub" style="background:#e9ecef; color:#495057; white-space:nowrap;" onclick="setSearchKeyword('${esc(item.text)}')">${esc(item.text)}</button>`;
+              h += `<button class="btn-sub" style="background:var(--bg-tag); color:var(--text-tag); white-space:nowrap; border:1px solid var(--border-color);" onclick="setSearchKeyword('${esc(item.text)}')">${esc(item.text)}</button>`;
         });
         h += `</div></div>`;
         area.innerHTML = h;
@@ -1675,7 +1695,7 @@ function r()  {
     if(areaNot) {
       if(notHistory.length > 0) {
         let h = `<div style="margin-bottom: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
-        h += `<label style="font-size:10px; color:#888;">履歴から除外:</label>`;
+            h += `<label style="font-size:10px; color:var(--text-sub);">履歴から除外:</label>`;
         h += `<div style="display:flex; overflow-x:auto; gap:5px; margin-top:5px; padding-bottom:5px; -webkit-overflow-scrolling: touch; max-width:100%;">`;
         const historyCount = st.settings.searchHistoryCount || 5;
         notHistory.slice(0, historyCount).forEach(item => {
@@ -1920,10 +1940,8 @@ function rIn(c) {
         items.forEach(o => {
             const t = typeof o === 'string' ? o : o.text;
             const isSel = val == t;
-            const bg = isSel ? '#007bff' : '#fff';
-            const color = isSel ? '#fff' : '#333';
-            const hoverEvents = `onmouseover="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='lightblue'" onmouseout="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='#fff'" ontouchstart="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='lightblue'" ontouchmove="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='#fff'" ontouchcancel="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='#fff'"`;
-            h += `<button type="button" class="btn-sub option-btn" data-fid="${f.id}" onclick="selectOption('${f.id}', '${esc(t)}', this)" style="background:${bg}; color:${color}; border:3px solid #ccc; padding:10px; flex:1; min-width:80px;" ${hoverEvents}>${esc(t)}</button>`;
+            const selClass = isSel ? ' selected-btn' : '';
+            h += `<button type="button" class="btn-sub option-btn${selClass}" data-fid="${f.id}" onclick="selectOption('${f.id}', '${esc(t)}', this)" style="padding:10px; flex:1; min-width:80px;">${esc(t)}</button>`;
         });
         h += `</div>`;
         break;
@@ -1936,10 +1954,8 @@ function rIn(c) {
         mItems.forEach(o => {
             const t = typeof o === 'string' ? o : o.text;
             const isSel = mSelected.includes(t);
-            const bg = isSel ? '#007bff' : '#fff';
-            const color = isSel ? '#fff' : '#333';
-            const hoverEvents = `onmouseover="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='lightblue'" onmouseout="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='#fff'" ontouchstart="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='lightblue'" ontouchmove="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='#fff'" ontouchcancel="if(this.style.backgroundColor !== 'rgb(0, 123, 255)') this.style.backgroundColor='#fff'"`;
-            h += `<button type="button" class="btn-sub option-btn" onclick="toggleMultiOption('${f.id}', '${esc(t)}', this)" style="background:${bg}; color:${color}; border:3px solid #ccc; padding:10px; flex:1; min-width:80px;" ${hoverEvents}>${esc(t)}</button>`;
+            const selClass = isSel ? ' selected-btn' : '';
+            h += `<button type="button" class="btn-sub option-btn${selClass}" onclick="toggleMultiOption('${f.id}', '${esc(t)}', this)" style="padding:10px; flex:1; min-width:80px;">${esc(t)}</button>`;
         });
         h += `</div>`;
         break;
@@ -1957,12 +1973,12 @@ function rIn(c) {
         // ▼▼▼ 変更: 候補を横スクロールで表示 ▼▼▼
         if (f.options && f.options.length > 0) {
             h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
-            h += `<label style="font-size:10px; color:#888;">候補をクリックして入力 (最近使った順):</label>`;
+            h += `<label style="font-size:10px; color:var(--text-sub);">候補をクリックして入力 (最近使った順):</label>`;
             h += `<div style="display:flex; overflow-x:auto; gap:5px; margin-top:5px; padding-bottom:5px; -webkit-overflow-scrolling: touch;">`;
             // f.optionsはオブジェクトの配列 {text, ts}
             const historyCount = st.settings.searchHistoryCount || 5;
             (f.options || []).slice(0, historyCount).forEach(optObj => {
-                h += `<button class="btn-sub" style="background:#e9ecef; color:#495057; white-space:nowrap;" onclick="addTextFromOption('${f.id}', '${esc(optObj.text)}')">${esc(optObj.text)}</button>`;
+                h += `<button class="btn-sub" style="background:var(--bg-tag); color:var(--text-tag); white-space:nowrap; border:1px solid var(--border-color);" onclick="addTextFromOption('${f.id}', '${esc(optObj.text)}')">${esc(optObj.text)}</button>`;
             });
             h += `</div></div>`;
         }
@@ -3684,7 +3700,7 @@ function rStock() {
         </div>
       <div style="position:relative;">
         <label style="font-size:10px; color:#666;">コメント (旧:適用)</label>
-        <textarea placeholder="コメント" data-name="${esc(item.name)}" oninput="autoResize(this)" onchange="updateStockAttribute(this.dataset.name, 'remarks', this.value)" onfocus="showStockHelper(this, '${esc(item.name).replace(/'/g, "\\'")}')" style="width:100%; min-height:3.5em; padding:6px; margin:0; font-size:12px; border:1px solid #ddd; border-radius:4px; background:#fcfcfc; resize:none; font-family:sans-serif; overflow-y:hidden;">${esc(item.remarks||'')}</textarea>
+        <textarea placeholder="コメント" data-name="${esc(item.name)}" oninput="autoResize(this)" onchange="updateStockAttribute(this.dataset.name, 'remarks', this.value)" onfocus="showStockHelper(this, '${esc(item.name).replace(/'/g, "\\'")}')" style="width:100%; min-height:3.5em; padding:6px; margin:0; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-main); resize:none; font-family:sans-serif; overflow-y:hidden;">${esc(item.remarks||'')}</textarea>
         <div class="stock-helper" style="display:none; background:#f0f8ff; padding:8px; border:1px solid #cce5ff; border-radius:4px; margin-top:5px; z-index:10;"></div>
       </div>
       </div>
@@ -3962,7 +3978,7 @@ function showStockHelper(el, name) {
   sortedWords.slice(0, 40).forEach(w => {
     const safeName = name.replace(/'/g, "\\'");
     const safeWord = w.replace(/'/g, "\\'");
-    html += `<button class="btn-sub" style="background:#fff; color:#333; border:1px solid #ddd; padding:4px 8px;" onclick="addStockRemarkWord('${safeName}', '${safeWord}')">${esc(w)}</button>`;
+    html += `<button class="btn-sub" style="background:var(--bg-tag); color:var(--text-tag); border:1px solid var(--border-color); padding:4px 8px;" onclick="addStockRemarkWord('${safeName}', '${safeWord}')">${esc(w)}</button>`;
   });
   html += `</div>`;
   
@@ -8080,8 +8096,9 @@ function rollbackRule(ruleIndex) {
              if (grp) {
                  grp.querySelectorAll('.option-btn').forEach(b => {
                      const isSel = (b.innerText === el.value);
-                     b.style.background = isSel ? '#007bff' : '#fff';
-                     b.style.color = isSel ? '#fff' : '#333';
+                     if (isSel) b.classList.add('selected-btn');
+                     else b.classList.remove('selected-btn');
+                     b.style.background = ''; b.style.color = '';
                  });
              }
           }
@@ -8251,7 +8268,8 @@ function selectOption(fid, val, btn) {
     grp.querySelectorAll('.option-btn').forEach(b => {
       const isSel = (!isDeselect && b === btn);
       b.style.background = isSel ? '#007bff' : '#fff';
-      b.style.color = isSel ? '#fff' : '#333';
+      b.style.background = isSel ? '#007bff' : 'var(--bg-tag)';
+      b.style.color = isSel ? '#fff' : 'var(--text-main)';
     });
   }
   if (!isDeselect) moveFocusToNext(btn);
@@ -8266,12 +8284,12 @@ function toggleMultiOption(fid, val, btn) {
   
   if (idx > -1) {
     currentVals.splice(idx, 1);
-    btn.style.background = '#fff';
-    btn.style.color = '#333';
+    btn.classList.remove('selected-btn');
+    btn.style.background = ''; btn.style.color = '';
   } else {
     currentVals.push(val);
-    btn.style.background = '#007bff';
-    btn.style.color = '#fff';
+    btn.classList.add('selected-btn');
+    btn.style.background = ''; btn.style.color = '';
   }
   
   input.value = currentVals.join(' ');
