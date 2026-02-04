@@ -3611,7 +3611,7 @@ function rStock() {
     let estInfo = '';
     if (item.estStock !== null) {
         const estColor = item.estStock < 0 ? '#dc3545' : '#007bff';
-        estInfo = `<div style="margin-top:5px; padding:5px; background:#f0f8ff; border-radius:4px; font-size:11px;">
+        estInfo = `<div style="margin-top:5px; padding:5px; background:rgba(0, 123, 255, 0.1); border-radius:4px; font-size:11px;">
           <b>通院日残:</b> <span style="color:${estColor}; font-weight:bold;">${item.estStock.toFixed(1)}</span> (あと${item.daysToNext}日)
           ${item.nextPrescription !== null ? ` / <b>次回処方:</b> <span style="font-weight:bold;">${item.nextPrescription.toFixed(1)}</span>` : ''}
         </div>`;
@@ -3623,7 +3623,7 @@ function rStock() {
         else if (!item.daysToNext) reasons.push('次回通院日未設定');
         
         if (reasons.length > 0) {
-            estInfo = `<div style="margin-top:5px; padding:5px; background:#fff3cd; border-radius:4px; font-size:10px; color:#856404;">⚠️ 自動計算不可: ${reasons.join(', ')}</div>`;
+            estInfo = `<div style="margin-top:5px; padding:5px; background:rgba(255, 193, 7, 0.2); border-radius:4px; font-size:10px; color:var(--text-main);">⚠️ 自動計算不可: ${reasons.join(', ')}</div>`;
         }
     }
     
@@ -3635,10 +3635,10 @@ function rStock() {
         let d2Str = '';
         if (item.nextNextDate) {
             const d2 = item.nextNextDate;
-            const daysStr = item.daysNextToNext ? ` <span style="font-size:11px; color:#666;">(日数:${item.daysNextToNext}日)</span>` : '';
+            const daysStr = item.daysNextToNext ? ` <span style="font-size:11px; color:var(--text-sub);">(日数:${item.daysNextToNext}日)</span>` : '';
             d2Str = ` / <b>次回通院日:</b> ${formatDateYMD(d2)}(${weeks[d2.getDay()]})${daysStr}`;
         }
-        hospitalInfo = `<div style="margin-top:5px; font-size:11px; color:#555;"><b>通院日:</b> ${d1Str}${d2Str} <span style="color:#999;">(${esc(item.matchedHospital)})</span></div>`;
+        hospitalInfo = `<div style="margin-top:5px; font-size:11px; color:var(--text-sub);"><b>通院日:</b> ${d1Str}${d2Str} <span style="opacity:0.7;">(${esc(item.matchedHospital)})</span></div>`;
     }
     
     const safeName = esc(item.name.replace(/'/g, "\\'"));
@@ -3661,14 +3661,14 @@ function rStock() {
          </div>`;
 
     return `
-    <div class="card" style="background:#fff; border-left: 5px solid ${color}; position:relative;">
+    <div class="card" style="border-left: 5px solid ${color}; position:relative;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <div style="font-weight:bold; font-size:16px; color:#333;">
+          <div style="font-weight:bold; font-size:16px;">
             ${esc(item.name)}
           </div>
-          <div style="font-size:11px; color:#666; margin-top:4px;">
-            最終更新: ${dateStr} <span style="color:#999;">(${esc(item.catName)})</span>
+          <div style="font-size:11px; color:var(--text-sub); margin-top:4px;">
+            最終更新: ${dateStr} <span style="opacity:0.7;">(${esc(item.catName)})</span>
           </div>
         </div>
         <div style="text-align:right;">
@@ -3682,24 +3682,24 @@ function rStock() {
       <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #eee;">
         <div style="display:flex; gap:5px; margin-bottom:5px; flex-wrap:wrap;">
           <div style="flex:2; min-width:120px;">
-            <label style="font-size:10px; color:#666;">病院・診療科</label>
+            <label style="font-size:10px; color:var(--text-sub);">病院・診療科</label>
             <select onchange="updateStockAttribute('${safeName}', 'hospital', this.value)" style="padding:6px; font-size:12px; margin:0;">${hospitalSelectOpts.replace(`value="${esc(item.hospital||'')}"`, `value="${esc(item.hospital||'')}" selected`)}</select>
           </div>
           <div style="flex:1; min-width:60px;">
-            <label style="font-size:10px; color:#666;">1日量</label>
+            <label style="font-size:10px; color:var(--text-sub);">1日量</label>
             <input type="number" step="0.01" placeholder="自動" value="${dailyDoseVal}" onchange="updateStockAttribute('${safeName}', 'dailyDose', this.value)" style="padding:6px; font-size:12px; margin:0; text-align:right;">
           </div>
           <div style="flex:1; min-width:50px;">
-            <label style="font-size:10px; color:#666;">単位</label>
+            <label style="font-size:10px; color:var(--text-sub);">単位</label>
             <input type="text" placeholder="錠" value="${esc(unitVal)}" onchange="updateStockAttribute('${safeName}', 'unit', this.value)" style="padding:6px; font-size:12px; margin:0;">
           </div>
           <div style="flex:1; min-width:60px;">
-            <label style="font-size:10px; color:#666;">処方日数</label>
+            <label style="font-size:10px; color:var(--text-sub);">処方日数</label>
             <input type="number" placeholder="日" value="${prescribedDaysVal}" onchange="updateStockAttribute('${safeName}', 'prescribedDays', this.value)" style="padding:6px; font-size:12px; margin:0; text-align:right;">
           </div>
         </div>
       <div style="position:relative;">
-        <label style="font-size:10px; color:#666;">コメント (旧:適用)</label>
+        <label style="font-size:10px; color:var(--text-sub);">コメント (旧:適用)</label>
         <textarea placeholder="コメント" data-name="${esc(item.name)}" oninput="autoResize(this)" onchange="updateStockAttribute(this.dataset.name, 'remarks', this.value)" onfocus="showStockHelper(this, '${esc(item.name).replace(/'/g, "\\'")}')" style="width:100%; min-height:3.5em; padding:6px; margin:0; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-main); resize:none; font-family:sans-serif; overflow-y:hidden;">${esc(item.remarks||'')}</textarea>
         <div class="stock-helper" style="display:none; background:#f0f8ff; padding:8px; border:1px solid #cce5ff; border-radius:4px; margin-top:5px; z-index:10;"></div>
       </div>
@@ -8020,8 +8020,9 @@ function parseAndExecuteRuleBlock(cat, blockStr, triggerField, triggerVal, ruleI
                       if (grp) {
                           grp.querySelectorAll('.option-btn').forEach(b => {
                               const isSel = (b.innerText === targetEl.value);
-                              b.style.background = isSel ? '#007bff' : '#fff';
-                              b.style.color = isSel ? '#fff' : '#333';
+                              if (isSel) b.classList.add('selected-btn');
+                              else b.classList.remove('selected-btn');
+                              b.style.background = ''; b.style.color = '';
                           });
                       }
                   }
@@ -8267,9 +8268,9 @@ function selectOption(fid, val, btn) {
   if (grp) {
     grp.querySelectorAll('.option-btn').forEach(b => {
       const isSel = (!isDeselect && b === btn);
-      b.style.background = isSel ? '#007bff' : '#fff';
-      b.style.background = isSel ? '#007bff' : 'var(--bg-tag)';
-      b.style.color = isSel ? '#fff' : 'var(--text-main)';
+      if (isSel) b.classList.add('selected-btn');
+      else b.classList.remove('selected-btn');
+      b.style.background = ''; b.style.color = '';
     });
   }
   if (!isDeselect) moveFocusToNext(btn);
