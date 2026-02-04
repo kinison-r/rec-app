@@ -32,19 +32,19 @@
       --bg-body: #f0f2f5;
       --text-main: #333;
       --text-sub: #666;
-      --bg-card: #fff;
+      --bg-card: #776e6e;
       --bg-input: #fcfcfc;
       --border-color: #ddd;
       --nav-bg: #f0f2f5;
     }
     body.dark-mode {
-      --bg-body: #121212;
-      --text-main: #e0e0e0;
-      --text-sub: #aaa;
-      --bg-card: #1e1e1e;
-      --bg-input: #2d2d2d;
-      --border-color: #444;
-      --nav-bg: #1e1e1e;
+      --bg-body: #1a1a1a;      /* 背景を真っ黒から少し明るく */
+      --text-main: #cccccc;    /* テキストの白を少し抑え、目に優しく */
+      --text-sub: #999999;     /* サブテキストも調整 */
+      --bg-card: #282828;      /* カード背景 */
+      --bg-input: #181818;     /* 入力欄の背景を暗く */
+      --border-color: #484848; /* 境界線の色を調整 */
+      --nav-bg: #282828;      /* ナビゲーション背景をカードと統一 */
     }
     /* ▲▲▲ 追加 ▲▲▲ */
     body {
@@ -772,7 +772,8 @@
              </div>
              <p id="save-dir-desc" style="font-size:10px; color:#666; margin-top:5px;">
                ※設定すると、すべてのファイル出力がこのフォルダに行われます。<br>
-               ※自動バックアップは固定名で上書き、手動出力は日時名で保存されます。
+               ※自動バックアップは固定名で上書き、手動出力は日時名で保存されます。<br>
+               <b style="color:#dc3545;">【注意】</b>モバイル端末では、ブラウザの仕様によりGoogle Drive等のクラウドストレージを直接選択できない場合があります。その場合は一度端末内に保存後、ファイル管理アプリ等で移動してください。
              </p>
           </div>
 
@@ -3408,6 +3409,12 @@ function getStockData() {
         item.dailyDose = estimateDailyDose(item.remarks);
     }
 
+    // 当日服用分をマイナスして表示する（次回処方調整用）
+    if (item.dailyDose > 0) {
+        item.qty = item.qty - item.dailyDose;
+        item.qty = parseFloat(item.qty.toFixed(2));
+    }
+
     item.estStock = null;
     item.nextPrescription = null;
     item.daysToNext = null;
@@ -3472,8 +3479,8 @@ function getStockData() {
         const daysToNext = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         item.daysToNext = daysToNext;
         
-        // 予定残薬数 = 現在在庫 - (1日消費 * 日数)
-        const consumeDays = Math.max(0, daysToNext);
+        // 予定残薬数 = 現在在庫(当日分引済) - (1日消費 * (日数-1))
+        const consumeDays = Math.max(0, daysToNext - 1);
         item.estStock = item.qty - (item.dailyDose * consumeDays);
         
         // 次回処方数 = 1日消費 * (次回〜次次回の日数)
@@ -4473,7 +4480,6 @@ async function expCSVSplit() {
   if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 async function expJSON() {
-  if (!window.JSZip) { alert('JSZipライブラリが読み込まれていません。'); return; }
   const mode = document.getElementById('csv-sel').value;
   let data;
   let jsonName;
@@ -4490,12 +4496,14 @@ async function expJSON() {
     jsonName = `${VERSION}_${ts}_action_${c ? c.name : 'unknown'}.json`;
   }
 
-  const zip = new JSZip();
-  zip.file(jsonName, JSON.stringify(data, jsonJstReplacer, 2));
-  const blob = await zip.generateAsync({type:'blob', compression:'DEFLATE'});
-  const zipName = jsonName.replace('.json', '.zip');
-
-  if(await saveBlob(blob, zipName)) { addIoLog('export', zipName, true); showToast('保存しました: ' + zipName); }
+  // ZIP圧縮せず直接JSONとして出力（JSZip依存排除・高速化）
+  try {
+    const jsonStr = JSON.stringify(data, jsonJstReplacer, 2);
+    const blob = new Blob([jsonStr], {type:'application/json'});
+    if(await saveBlob(blob, jsonName)) { addIoLog('export', jsonName, true); showToast('保存しました: ' + jsonName); }
+  } catch(e) {
+    alert('JSON出力エラー: ' + e.message);
+  }
 }
 async function expImages() {
   if (!window.JSZip) { alert('JSZipライブラリが読み込まれていません。'); return; }
