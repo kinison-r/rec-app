@@ -3506,8 +3506,8 @@ function getStockData() {
         const daysToNext = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         item.daysToNext = daysToNext;
         
-        // 予定残薬数 = 現在在庫(当日分引済) - (1日消費 * (日数-1))
-        const consumeDays = Math.max(0, daysToNext - 1);
+        // 予定残薬数 = 現在在庫(当日分引済) - (1日消費 * 日数)
+        const consumeDays = Math.max(0, daysToNext);
         item.estStock = item.qty - (item.dailyDose * consumeDays);
         
         // 次回処方数 = 1日消費 * (次回〜次次回の日数)
