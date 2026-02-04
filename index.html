@@ -36,15 +36,21 @@
       --bg-input: #fcfcfc;
       --border-color: #ddd;
       --nav-bg: #f0f2f5;
+      --bg-tag: #f1f3f5;
+      --text-tag: #495057;
+      --text-tag-b: #212529;
     }
     body.dark-mode {
-      --bg-body: #1a1a1a;      /* 背景を真っ黒から少し明るく */
-      --text-main: #cccccc;    /* テキストの白を少し抑え、目に優しく */
-      --text-sub: #999999;     /* サブテキストも調整 */
-      --bg-card: #282828;      /* カード背景 */
-      --bg-input: #181818;     /* 入力欄の背景を暗く */
-      --border-color: #484848; /* 境界線の色を調整 */
-      --nav-bg: #282828;      /* ナビゲーション背景をカードと統一 */
+      --bg-body: #000000;      /* 背景をより黒くしてコントラスト向上 */
+      --text-main: #ffffff;    /* テキストを白く */
+      --text-sub: #bbbbbb;     /* サブテキストも明るめに */
+      --bg-card: #1c1c1e;      /* カード背景を暗いグレーに修正 */
+      --bg-input: #2c2c2e;     /* 入力欄の背景 */
+      --border-color: #3a3a3c; /* 境界線 */
+      --nav-bg: #1c1c1e;       /* ナビゲーション */
+      --bg-tag: #333333;       /* 項目タグの背景を暗く */
+      --text-tag: #e0e0e0;     /* 項目タグの文字色 */
+      --text-tag-b: #ffffff;   /* 項目タグの太字色 */
     }
     /* ▲▲▲ 追加 ▲▲▲ */
     body {
@@ -225,7 +231,9 @@
     .field-tag {
       display: inline-block;
       background: #f1f3f5;
+      background: var(--bg-tag);
       color: #495057;
+      color: var(--text-tag);
       padding: 4px 8px;
       border-radius: 16px;
       font-size: 12px;
@@ -235,6 +243,7 @@
     }
     .field-tag b {
       color: #212529;
+      color: var(--text-tag-b);
       margin-right: 5px;
     }
     label {
