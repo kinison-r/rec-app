@@ -3576,7 +3576,7 @@ function rStock() {
   
   // ヘッダー部分（ソート・表示切替）
   const headerHtml = `
-    <div style="padding:10px; background:#f8f9fa; border-radius:8px; margin-bottom:10px; border:1px solid #eee;">
+    <div style="padding:10px; background:var(--bg-tag); border-radius:8px; margin-bottom:10px; border:1px solid var(--border-color);">
       <div style="display:flex; justify-content:flex-end; gap:5px; margin-bottom:10px;">
         <button class="btn-sub" style="background:#6f42c1; color:white; font-weight:bold; padding:4px 10px;" onclick="showStockPrint()">残薬リスト</button>
         <button class="btn-sub" style="background:#28a745; color:white; font-weight:bold; padding:4px 10px;" onclick="expStockCSV()">CSV出力</button>
@@ -3593,7 +3593,7 @@ function rStock() {
           <span style="cursor:pointer; margin-left:5px;" onclick="toggleStockSortOrder()">${sortAsc ? '▲' : '▼'}</span>
         </div>
         <div style="font-size:12px; font-weight:bold; display:flex; align-items:center; gap:5px;">
-           対象期間: <input type="number" min="1" max="60" value="${st.settings.stockPeriodMonths}" onchange="updateStockPeriod(this.value)" style="width:50px; padding:4px; font-size:12px; margin:0; border:1px solid #ddd; border-radius:4px;"> ヶ月以内
+           対象期間: <input type="number" min="1" max="60" value="${st.settings.stockPeriodMonths}" onchange="updateStockPeriod(this.value)" style="width:50px; padding:4px; font-size:12px; margin:0; border:1px solid var(--border-color); border-radius:4px;"> ヶ月以内
         </div>
       </div>
     </div>
