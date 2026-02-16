@@ -302,6 +302,7 @@
       body.print-mode-mylan #mylan-chart-area { display: block !important; }
       body.print-mode-stock #stock-print-area { display: block !important; }
       body.print-mode-cross #cross-analysis-area { display: block !important; }
+      body.print-mode-medical #medical-expenses-area { display: block !important; }
       
       /* 横断分析用スタイル */
       .cross-top-scroll { overflow-x: auto; overflow-y: hidden; border: 1px solid #ddd; border-bottom: none; height: 20px; width: 100%; }
@@ -593,6 +594,9 @@
           <div style="margin-bottom:15px;">
             <a href="javascript:void(0)" onclick="toggleMylanChart()" style="font-size:16px; font-weight:bold; color:#20c997; text-decoration:underline;">クレメジン（マイラン）服用から排便までの日数</a>
           </div>
+          <div style="margin-bottom:15px;">
+            <a href="javascript:void(0)" onclick="toggleMedicalExpenses()" style="font-size:16px; font-weight:bold; color:#dc3545; text-decoration:underline;">確定申告医療費控除集計</a>
+          </div>
         </div>
       </details>
 
@@ -666,6 +670,18 @@
         </div>
         <div style="position:relative; height:400px; width:100%;"><canvas id="mylanPieChart"></canvas></div>
         <div id="mylan-stats" style="margin-top:10px; font-size:12px; text-align:center; font-weight:bold;"></div>
+      </div>
+    </div>
+    <div id="medical-expenses-area" style="display:none;">
+      <div class="card">
+        <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:10px;">
+          <h2 class="section-title" style="margin:0; border:none; padding:0;">医療費控除集計</h2>
+          <div class="d-flex gap-1">
+            <button class="btn-sub" onclick="printArea('medical')">印刷</button>
+            <button class="btn-sub" onclick="document.getElementById('medical-expenses-area').style.display='none'">閉じる</button>
+          </div>
+        </div>
+        <div id="medical-expenses-body"></div>
       </div>
     </div>
 
@@ -752,6 +768,7 @@
              <p style="font-size:10px; color:#666; margin-top:5px;">
                ※「if [A]='空' ...」のように「空」「未入力」「EMPTY」を指定すると、値が空であることを条件にできます。
                ※「if [A] >= 10 then [B]='OK'」のように比較条件（>=, <=, >, <, =, !=, 以上, 以下など）も使えます。
+               ※日付計算も可能です (例: `then [予定日] = today() + 7 days`)。
              </p>
           </div>
           <button class="btn-main" id="btn-cat-save" onclick="saveCat()">新規作成</button>
@@ -5152,6 +5169,103 @@ function renderMylanChart() {
   });
 }
 
+// ▼▼▼ 追加: 医療費控除集計機能 ▼▼▼
+function toggleMedicalExpenses() {
+  const el = document.getElementById('medical-expenses-area');
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    renderMedicalExpenses();
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function renderMedicalExpenses() {
+  // カテゴリ特定
+  const cat = st.cats.find(c => c.name === '医療費控除' || c.id === 'c1770536843376');
+  if (!cat) {
+    document.getElementById('medical-expenses-body').innerHTML = '<div style="padding:20px; text-align:center;">カテゴリー「医療費控除」が見つかりません。</div>';
+    return;
+  }
+
+  // フィールド特定
+  const fDate = cat.fields.find(f => f.type === 'date' || f.name.includes('日付'));
+  const fHospital = cat.fields.find(f => f.name.includes('病院') || f.name.includes('薬局') || f.name.includes('名称'));
+  const fPerson = cat.fields.find(f => f.name === 'ｃ' || f.name === 'c' || f.name.includes('対象者') || f.name.includes('氏名') || f.name.includes('名前'));
+  const fType = cat.fields.find(f => f.name.includes('区分') || f.name.includes('種別'));
+  const fAmount = cat.fields.find(f => (f.name.includes('支払') || f.name.includes('金額') || f.name.includes('費用')) && !f.name.includes('補填'));
+  const fComp = cat.fields.find(f => f.name.includes('補填') || f.name.includes('保険金'));
+
+  if (!fDate || !fHospital || !fPerson || !fType || !fAmount || !fComp) {
+     const missing = [];
+     if(!fDate) missing.push('日付');
+     if(!fHospital) missing.push('病院・薬局等の名称');
+     if(!fPerson) missing.push('対象者');
+     if(!fType) missing.push('医療費の区分');
+     if(!fAmount) missing.push('支払った医療費の額');
+     if(!fComp) missing.push('保健金等で補填される額');
+     document.getElementById('medical-expenses-body').innerHTML = `<div style="padding:20px; text-align:center; color:#dc3545;">エラー: 以下の項目が見つかりません。<br><b>${missing.join(', ')}</b><br><br><small>※項目名が正確か（全角・半角など）確認してください。</small></div>`;
+     return;
+  }
+
+  // 集計処理
+  const agg = {}; // { year: { key: { hospital, person, type, amount, comp, count } } }
+
+  cat.records.forEach(r => {
+    const dt = getDt(r);
+    const year = dt.getFullYear();
+    
+    const hospital = r[fHospital.id] || '(不明)';
+    const person = r[fPerson.id] || '(不明)';
+    let typeVal = r[fType.id] || '(不明)';
+    if (Array.isArray(typeVal)) typeVal = typeVal.join(', ');
+
+    const parseMoney = (v) => {
+       if (!v) return 0;
+       const n = parseFloat(String(v).replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/,/g, ''));
+       return isNaN(n) ? 0 : n;
+    };
+    const amount = parseMoney(r[fAmount.id]);
+    const comp = parseMoney(r[fComp.id]);
+
+    if (!agg[year]) agg[year] = {};
+    const key = `${hospital}|${person}|${typeVal}`;
+    
+    if (!agg[year][key]) {
+      agg[year][key] = { hospital, person, type: typeVal, amount: 0, comp: 0, count: 0 };
+    }
+    agg[year][key].amount += amount;
+    agg[year][key].comp += comp;
+    agg[year][key].count++;
+  });
+
+  // HTML生成
+  let html = '';
+  const years = Object.keys(agg).sort((a,b) => b - a);
+
+  if (years.length === 0) {
+    html = '<div style="padding:20px; text-align:center;">集計対象のデータがありません。</div>';
+  } else {
+    years.forEach(year => {
+      html += `<h3 style="margin-top:20px; border-bottom:2px solid #007bff; padding-bottom:5px;">${year}年分</h3>`;
+      html += `<table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:10px;"><thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ddd; padding:5px; text-align:left;">対象者</th><th style="border:1px solid #ddd; padding:5px; text-align:left;">病院・薬局等</th><th style="border:1px solid #ddd; padding:5px; text-align:left;">区分</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">支払額</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">補填額</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">控除対象</th></tr></thead><tbody>`;
+      
+      let yearTotalPay = 0, yearTotalComp = 0;
+      const rows = Object.values(agg[year]).sort((a,b) => { if (a.person !== b.person) return a.person.localeCompare(b.person); return a.hospital.localeCompare(b.hospital); });
+
+      rows.forEach(row => {
+        const net = row.amount - row.comp;
+        yearTotalPay += row.amount; yearTotalComp += row.comp;
+        html += `<tr><td style="border:1px solid #ddd; padding:5px;">${esc(row.person)}</td><td style="border:1px solid #ddd; padding:5px;">${esc(row.hospital)}</td><td style="border:1px solid #ddd; padding:5px;">${esc(row.type)}</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${row.amount.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${row.comp.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right; font-weight:bold;">${net.toLocaleString()}</td></tr>`;
+      });
+      const yearNet = yearTotalPay - yearTotalComp;
+      html += `<tr style="background:#e7f1ff; font-weight:bold;"><td colspan="3" style="border:1px solid #ddd; padding:5px; text-align:center;">合計</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${yearTotalPay.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${yearTotalComp.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right; color:#0056b3;">${yearNet.toLocaleString()}</td></tr></tbody></table>`;
+    });
+  }
+  document.getElementById('medical-expenses-body').innerHTML = html;
+}
+// ▲▲▲ 追加 ▲▲▲
+
 // ▼▼▼ 追加: カテゴリー行の色更新ヘルパー ▼▼▼
 function updateCategoryColor(details) {
   if (!details) return;
@@ -6945,8 +7059,27 @@ async function clean() {
   const fname = `${VERSION}_${ts}_全件行動ログ.json`;
   const saved = await saveBlob(blob, fname);
   if (saved) addIoLog('export', fname, true);
+
+  // 削除対象データの保存
+  const deletedCats = [];
+  let deletedCount = 0;
+  st.cats.forEach(c => {
+    const recsToDelete = c.records.filter(r => getDt(r) <= target);
+    if (recsToDelete.length > 0) {
+      deletedCats.push({ ...c, records: recsToDelete });
+      deletedCount += recsToDelete.length;
+    }
+  });
+
+  if (deletedCount > 0) {
+    const delBlob = new Blob([JSON.stringify({ format: 'partial_backup', version: VERSION, cats: deletedCats, description: `Deleted records until ${ds}` }, jsonJstReplacer, 2)], {type:'application/json'});
+    const delFname = `${VERSION}_${ts}_削除データ_${ds}.json`;
+    const savedDel = await saveBlob(delBlob, delFname);
+    if (savedDel) addIoLog('export', delFname, true);
+  }
+
   st.cats.forEach(c => c.records = c.records.filter(r => getDt(r) > target)); // バックアップ保存後に削除
-  save(); r(); alert('整理完了');
+  save(); r(); alert(`整理完了 (削除: ${deletedCount}件)`);
 }
 
 async function resetApp() {
@@ -7632,6 +7765,61 @@ function loadRuleToBuilder(ruleStr) {
 }
 // ▲▲▲ 追加 ▲▲▲
 
+// ▼▼▼ 追加: 日付計算解決ヘルパー ▼▼▼
+function resolveDateMath(expression, cat) {
+    let resolved = expression.trim();
+
+    // Helper to get field value from the form
+    const getFieldValue = (fid) => {
+        const el = document.getElementById('i-' + fid);
+        if (el) return el.value;
+        const multis = document.querySelectorAll('.multi-' + fid);
+        if (multis.length > 0) return Array.from(multis).map(m => m.value.trim()).filter(v=>v).join(' ');
+        return '';
+    };
+
+    // 1. Replace field names with their date values
+    if (cat && cat.fields) {
+        const sortedFields = [...cat.fields].sort((a, b) => b.name.length - a.name.length);
+        sortedFields.forEach(f => {
+            const pattern = new RegExp(`\\[${f.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`, 'g');
+            if (resolved.match(pattern)) {
+                const v = getFieldValue(f.id);
+                if (v && !isNaN(new Date(v).getTime())) {
+                    resolved = resolved.replace(pattern, `'${v}'`);
+                } else {
+                    resolved = resolved.replace(pattern, `'invalid-date'`);
+                }
+            }
+        });
+    }
+
+    // 2. Replace today() and now()
+    resolved = resolved.replace(/today\(\)/gi, `'${formatDateYMD(new Date())}'`);
+    resolved = resolved.replace(/now\(\)/gi, `'${toJSTISOString(new Date())}'`);
+
+    // 3. Perform the calculation
+    const dateCalcRegex = /(['"]\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3}Z?|\+\d{2}:\d{2})?)?['"])\s*([+-])\s*(\d+)\s*(day|week|month|year)s?/i;
+    for (let i = 0; i < 5; i++) { // Safety break
+        let match = resolved.match(dateCalcRegex);
+        if (!match) break;
+        const [fullMatch, dateStr, operator, num, unit] = match;
+        const d = new Date(dateStr.slice(1, -1));
+        if (isNaN(d.getTime())) break;
+        const amount = parseInt(num) * (operator === '-' ? -1 : 1);
+        switch (unit.toLowerCase()) {
+            case 'day': d.setDate(d.getDate() + amount); break;
+            case 'week': d.setDate(d.getDate() + amount * 7); break;
+            case 'month': d.setMonth(d.getMonth() + amount); break;
+            case 'year': d.setFullYear(d.getFullYear() + amount); break;
+        }
+        resolved = resolved.replace(fullMatch, `'${formatDateYMD(d)}'`);
+    }
+    const finalMatch = resolved.trim().match(/^'(\d{4}-\d{2}-\d{2})'$/);
+    return finalMatch ? finalMatch[1] : expression.trim();
+}
+// ▲▲▲ 追加 ▲▲▲
+
 function checkRules(e) {
   if (st.view !== 'input') return;
   
@@ -7853,19 +8041,26 @@ function parseAndExecuteRuleBlock(cat, blockStr, triggerField, triggerVal, ruleI
 
   evalStr = evalStr.replace(condRegex, (match, fNameRaw, opRaw, valRaw) => {
       let fName = fNameRaw.replace(/^\[|\]$/g, '');
-      let field = cat.fields.find(f => f.name === fName);
+      const field = cat.fields.find(f => f.name === fName);
       if (!field) return 'false';
 
       let op = opRaw || '=';
       let val = valRaw.trim();
       
-      // 値の復元
-      val = val.replace(/__STR_(\d+)__/g, (_, idx) => {
-          const s = stringLiterals[parseInt(idx)];
-          return s.substring(1, s.length - 1); // クォート除去
-      });
-      // クォートなしの場合のクリーニング
-      if (!valRaw.includes('__STR_')) val = cleanRuleValue(val);
+      // ▼▼▼ 変更: 日付計算を先に解決 ▼▼▼
+      const resolvedDate = resolveDateMath(val, cat);
+      if (resolvedDate !== val) {
+          val = resolvedDate;
+      } else {
+          // 値の復元
+          val = val.replace(/__STR_(\d+)__/g, (_, idx) => {
+              const s = stringLiterals[parseInt(idx)];
+              return s.substring(1, s.length - 1); // クォート除去
+          });
+          // クォートなしの場合のクリーニング
+          if (!valRaw.includes('__STR_')) val = cleanRuleValue(val);
+      }
+      // ▲▲▲ 変更 ▲▲▲
 
       // 演算子正規化
       if (op.match(/(>=|=>|以上)/)) op = '>=';
@@ -7934,45 +8129,49 @@ function parseAndExecuteRuleBlock(cat, blockStr, triggerField, triggerVal, ruleI
   let match;
   while ((match = actionRegex.exec(actionStr)) !== null) {
       let targetName = match[1].replace(/^\[|\]$/g, '');
-      let valRaw = match[2].trim();
-      
-      // 1. 自画面のフィールド値を置換
-      cat.fields.forEach(f => {
-          const fNameEsc = f.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const pattern = new RegExp(`\\[${fNameEsc}\\]`, 'g');
-          if (valRaw.match(pattern)) {
-             const v = getFieldValue(f.id);
-             valRaw = valRaw.replace(pattern, `'${String(v).replace(/'/g, "\\'")}'`);
-          }
-      });
-
-      // 2. リテラル復元
-      let valExpanded = valRaw.replace(/__STR_(\d+)__/g, (_, idx) => {
-          const s = actionLiterals[parseInt(idx)];
-          return s; // クォート付きのまま戻す
-      });
-
-      // 3. 式として評価
+      const valRaw = match[2].trim();
       let val;
-      try {
-          // 数値変換ヘルパー (単位付き文字列などから数値を抽出)
-          const smartNum = (v) => {
-             if(typeof v === 'number') return v;
-             if(!v) return 0;
-             const s = String(v).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/,/g, '');
-             const m = s.match(/-?\d+(\.\d+)?/);
-             return m ? parseFloat(m[0]) : 0;
-          };
-          val = new Function('number','int','float','str', 'return ' + valExpanded)(smartNum, parseInt, parseFloat, String);
-      } catch (e) {
-          val = valExpanded; // エラー時は文字列として扱う
-          // 既存のクリーニング処理
-          val = val.replace(/^[=＝:：\->→\s　\]］)）}｝]+|[=＝:：\->→\s　,\[［(（{｛]+$/g, '');
-          const quoteMatch = val.match(/^(['"])(.*)\1$/);
-          if (quoteMatch) val = quoteMatch[2];
-          else val = val.replace(/^\[(.*)\]$/, '$1').replace(/^「(.*)」$/, '$1').replace(/^『(.*)』$/, '$1');
-          if (val.toUpperCase() === 'EMPTY' || val.toUpperCase() === 'NULL' || val === '空' || val === '未入力') val = '';
+      
+      // ▼▼▼ 変更: 日付計算を先に解決 ▼▼▼
+      const resolvedDate = resolveDateMath(valRaw, cat);
+      if (resolvedDate !== valRaw) {
+          val = resolvedDate;
+      } else {
+          // 1. 自画面のフィールド値を置換
+          let valWithFields = valRaw;
+          cat.fields.forEach(f => {
+              const fNameEsc = f.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const pattern = new RegExp(`\\[${fNameEsc}\\]`, 'g');
+              if (valWithFields.match(pattern)) {
+                 const v = getFieldValue(f.id);
+                 valWithFields = valWithFields.replace(pattern, `'${String(v).replace(/'/g, "\\'")}'`);
+              }
+          });
+
+          // 2. リテラル復元
+          const valExpanded = valWithFields.replace(/__STR_(\d+)__/g, (_, idx) => {
+              const s = actionLiterals[parseInt(idx)];
+              return s; // クォート付きのまま戻す
+          });
+
+          // 3. 式として評価
+          try {
+              const smartNum = (v) => {
+                 if(typeof v === 'number') return v; if(!v) return 0;
+                 const s = String(v).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/,/g, '');
+                 const m = s.match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : 0;
+              };
+              val = new Function('number','int','float','str', 'return ' + valExpanded)(smartNum, parseInt, parseFloat, String);
+          } catch (e) {
+              val = valExpanded; // エラー時は文字列として扱う
+              val = val.replace(/^[=＝:：\->→\s　\]］)）}｝]+|[=＝:：\->→\s　,\[［(（{｛]+$/g, '');
+              const quoteMatch = val.match(/^(['"])(.*)\1$/);
+              if (quoteMatch) val = quoteMatch[2];
+              else val = val.replace(/^\[(.*)\]$/, '$1').replace(/^「(.*)」$/, '$1').replace(/^『(.*)』$/, '$1');
+              if (val.toUpperCase() === 'EMPTY' || val.toUpperCase() === 'NULL' || val === '空' || val === '未入力') val = '';
+          }
       }
+      // ▲▲▲ 変更 ▲▲▲
 
       const isAlert = (targetName === 'ALERT' || targetName === '警告');
       const isToast = (targetName === 'TOAST' || targetName === '通知');
