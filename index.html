@@ -15,6 +15,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- Cropper.js (画像編集) -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
@@ -5246,6 +5247,9 @@ function renderMedicalExpenses() {
   if (years.length === 0) {
     html = '<div style="padding:20px; text-align:center;">集計対象のデータがありません。</div>';
   } else {
+    html += `<div style="text-align:right; margin-bottom:10px;">
+      <button class="btn-sub" style="background:#28a745; color:white; font-weight:bold; padding:6px 12px;" onclick="expMedicalExpensesExcel()">医療費集計フォーマット(Excel)出力</button>
+    </div>`;
     years.forEach(year => {
       html += `<h3 style="margin-top:20px; border-bottom:2px solid #007bff; padding-bottom:5px;">${year}年分</h3>`;
       html += `<table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:10px;"><thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ddd; padding:5px; text-align:left;">対象者</th><th style="border:1px solid #ddd; padding:5px; text-align:left;">病院・薬局等</th><th style="border:1px solid #ddd; padding:5px; text-align:left;">区分</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">支払額</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">補填額</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">控除対象</th></tr></thead><tbody>`;
@@ -5263,6 +5267,69 @@ function renderMedicalExpenses() {
     });
   }
   document.getElementById('medical-expenses-body').innerHTML = html;
+}
+
+async function expMedicalExpensesExcel() {
+  if (typeof XLSX === 'undefined') { alert('Excel出力ライブラリ(SheetJS)が読み込まれていません。インターネット接続を確認してください。'); return; }
+
+  const cat = st.cats.find(c => c.name === '医療費控除' || c.id === 'c1770536843376');
+  if (!cat) { alert('カテゴリー「医療費控除」が見つかりません。'); return; }
+
+  const fDate = cat.fields.find(f => f.type === 'date' || f.name.includes('日付'));
+  const fHospital = cat.fields.find(f => f.name.includes('病院') || f.name.includes('薬局') || f.name.includes('名称'));
+  const fPerson = cat.fields.find(f => f.name === 'ｃ' || f.name === 'c' || f.name.includes('対象者') || f.name.includes('氏名') || f.name.includes('名前'));
+  const fType = cat.fields.find(f => f.name.includes('区分') || f.name.includes('種別'));
+  const fAmount = cat.fields.find(f => (f.name.includes('支払') || f.name.includes('金額') || f.name.includes('費用')) && !f.name.includes('補填'));
+  const fComp = cat.fields.find(f => f.name.includes('補填') || f.name.includes('保険金'));
+
+  if (!fDate || !fHospital || !fPerson || !fType || !fAmount || !fComp) {
+     alert('必須項目が見つかりません。'); return;
+  }
+
+  const data = [
+    ["No", "医療を受けた人", "病院・薬局などの名称", "診療・治療", "医薬品購入", "介護保険サービス", "その他の医療費", "支払った医療費の金額", "左のうち、補填される金額", "支払年月日"]
+  ];
+
+  const records = [...cat.records].sort((a, b) => getDt(a) - getDt(b));
+
+  records.forEach((r, i) => {
+    const no = i + 1;
+    const person = (r[fPerson.id] || '').trim();
+    const hospital = (r[fHospital.id] || '').trim();
+    
+    let typeVal = r[fType.id] || '';
+    if (Array.isArray(typeVal)) typeVal = typeVal.join(' ');
+    typeVal = String(typeVal);
+
+    const isTreatment = (typeVal.includes('診療') || typeVal.includes('治療')) ? '該当する' : '';
+    const isMedicine = (typeVal.includes('医薬') || typeVal.includes('薬')) ? '該当する' : '';
+    const isNursing = (typeVal.includes('介護')) ? '該当する' : '';
+    const isOther = (typeVal.includes('その他')) ? '該当する' : '';
+
+    const parseMoney = (v) => {
+       if (!v) return '';
+       const n = parseFloat(String(v).replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/,/g, ''));
+       return isNaN(n) ? '' : n;
+    };
+    const amount = parseMoney(r[fAmount.id]);
+    const comp = parseMoney(r[fComp.id]);
+    
+    const dt = getDt(r);
+    const dateStr = `${dt.getFullYear()}/${dt.getMonth() + 1}/${dt.getDate()}`;
+
+    data.push([no, person, hospital, isTreatment, isMedicine, isNursing, isOther, amount, comp, dateStr]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  XLSX.utils.book_append_sheet(wb, ws, "医療費控除集計");
+
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], { type: 'application/octet-stream' });
+  
+  const ts = getTS();
+  const name = `${VERSION}_${ts}_medical_expenses.xlsx`;
+  if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 // ▲▲▲ 追加 ▲▲▲
 
