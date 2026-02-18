@@ -3454,8 +3454,14 @@ function getStockData() {
 
     item.originalQty = item.qty; // 元の在庫数を保存
 
+    // 最終更新が今日かどうか判定
+    const todayStart = new Date();
+    todayStart.setHours(0,0,0,0);
+    const isUpdatedToday = item.dt >= todayStart;
+
     // 当日服用分をマイナスして表示する（次回処方調整用）
-    if (item.dailyDose > 0) {
+    // ※本日更新済みの場合は、既に実在庫が減っているとみなしてマイナスしない
+    if (item.dailyDose > 0 && !isUpdatedToday) {
         item.qty = item.qty - item.dailyDose;
         item.qty = parseFloat(item.qty.toFixed(2));
     }
@@ -7398,9 +7404,11 @@ async function resetApp() {
     const eEl = document.getElementById(p.e);
     if (sEl && !sEl.value) sEl.value = sStr;
     if (eEl && !eEl.value) eEl.value = eStr;
+
   });
   // ▲▲▲ 追加 ▲▲▲
-})(); // init end
+}
+)(); // init end
 
 // ▼▼▼ 追加: アプリ概要表示 ▼▼▼
 function showAppSummary() {
@@ -8607,7 +8615,7 @@ if (formInEl) {
     if (e.key === 'Enter' && e.target.matches('input')) { e.preventDefault(); moveFocusToNext(e.target); }
   });
 }
-// ▲▲▲ 追加 ▲▲▲
+// ▲▲▲ 追加 ▲▲▲ 
 </script>
 </body>
 </html>
