@@ -4,21 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>行動ログ</title>
-  <meta name="theme-color" content="#28a745">
+  <meta name="theme-color" content="#007bff">
   
-  <!-- アイコンとマニフェスト (Data URIで埋め込み) -->
-  <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzI4YTc0NSIgcng9IjY0IiByeT0iNjQiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2xkIiBmb250LXNpemU9IjI1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zNWVtIiBmaWxsPSJ3aGl0ZSI+5YGlPC90ZXh0Pjwvc3ZnPg==">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzI4YTc0NSIgcng9IjY0IiByeT0iNjQiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2xkIiBmb250LXNpemU9IjI1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zNWVtIiBmaWxsPSJ3aGl0ZSI+5YGlPC90ZXh0Pjwvc3ZnPg==">
+  <!-- アイコン設定: GitHub上の index.html と同じ場所に icon.png を置いてください -->
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="icon" href="icon.png">
 
   <!-- Chart.js & Plugin -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
   <!-- Cropper.js (画像編集) -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js" defer></script>
 
   <style>
     * {
@@ -1020,12 +1020,6 @@
         </div>
       </details>
 
-      <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
-        <summary style="font-weight:bold; cursor:pointer;">このコード</summary>
-        <div class="mt-2">
-          <button class="btn-main" style="background:#6c757d;" onclick="showAppSummary()">「行動ログ６１０」の概要を表示</button>
-        </div>
-      </details>
 
     </div>
   </div>
@@ -1625,16 +1619,22 @@ function v(name) {
   r();
 }
 
+// ▼▼▼ 変更: r関数のリファクタリング ▼▼▼
 function r()  {
-  // 読み込み完了したらローディング表示を消す
+  const c = initView();
+  if (st.view === 'input') renderInputView(c);
+  else if (st.view === 'search') renderSearchView();
+  else if (st.view === 'analysis') renderAnalysisView();
+  else if (st.view === 'maint') renderMaintView(c);
+}
+
+function initView() {
   const loader = document.getElementById('loading-msg');
   if(loader) loader.style.display = 'none';
 
-  // バージョン表示の反映
   document.title = "行動ログ " + VERSION;
   document.getElementById('ver-tag').innerText = VERSION;
 
-  // 背景色リセット (CSS変数に任せるためインラインスタイル削除)
   document.body.style.background = '';
 
   ['input', 'search', 'analysis', 'maint'].forEach(n => {
@@ -1643,18 +1643,18 @@ function r()  {
 
   const c = st.cats.find(x => x.id === st.cur) || st.cats[0];
   if (c) st.cur = c.id;
+  return c;
+}
 
-  // 記録画面の場合、カテゴリー色を背景に薄く適用 (ダークモード時は適用しない)
+function renderInputView(c) {
   if (st.view === 'input' && c && c.color && /^#[0-9A-Fa-f]{6}$/.test(c.color) && !(st.settings && st.settings.darkMode)) {
     const h = c.color;
     const r = parseInt(h.slice(1,3), 16), g = parseInt(h.slice(3,5), 16), b = parseInt(h.slice(5,7), 16);
     document.body.style.background = `rgba(${r},${g},${b},0.15)`;
   }
 
-  // ▼▼▼ 変更: お気に入り対応（記録画面のみグループ分け） ▼▼▼
   const makeOpt = (x) => `<option value="${x.id}" style="background:${x.color}; color:#fff;" ${x.id === st.cur ? 'selected' : ''}>${esc(x.name)}</option>`;
   
-  // 記録画面用 (sel-in)
   const favs = st.cats.filter(c => c.favorite);
   const others = st.cats.filter(c => !c.favorite);
   let optsIn = '';
@@ -1666,25 +1666,22 @@ function r()  {
   }
   document.getElementById('sel-in').innerHTML = optsIn || '<option>なし</option>';
 
-  // 項目設定用 (sel-f) は通常の並び順
-  document.getElementById('sel-f').innerHTML = st.cats.map(makeOpt).join('') || '<option>なし</option>';
-  // ▲▲▲ 変更 ▲▲▲
-  
-  const csvSel = document.getElementById('csv-sel');
-  if (csvSel) {
-    csvSel.innerHTML = '<option value="all">全カテゴリー一括</option>' + st.cats.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
-  }
+  if (c) rIn(c);
+}
 
-  if (st.view === 'input' && c) rIn(c);
-  if (st.view === 'search') {
-    const el = document.getElementById('srch-cat');
-    if(el) {
-      const v = el.value;
-      el.innerHTML = '<option value="">全カテゴリー</option>' + st.cats.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
-      el.value = v;
-    }
-    
-    // 検索履歴の描画
+function renderSearchView() {
+  const el = document.getElementById('srch-cat');
+  if(el) {
+    const v = el.value;
+    el.innerHTML = '<option value="">全カテゴリー</option>' + st.cats.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
+    el.value = v;
+  }
+  
+  renderSearchHistory();
+  rAnlz(true, false);
+}
+
+function renderSearchHistory() {
     const history = st.settings.searchHistory || [];
     const dl = document.getElementById('srch-datalist');
     if(dl) dl.innerHTML = history.map(h => `<option value="${esc(h.text)}"></option>`).join('');
@@ -1704,7 +1701,6 @@ function r()  {
       } else { area.innerHTML = ''; }
     }
     
-    // 除外キーワード履歴の描画
     const notHistory = st.settings.searchNotHistory || [];
     const dlNot = document.getElementById('srch-not-datalist');
     if(dlNot) dlNot.innerHTML = notHistory.map(h => `<option value="${esc(h.text)}"></option>`).join('');
@@ -1723,14 +1719,35 @@ function r()  {
         areaNot.innerHTML = h;
       } else { areaNot.innerHTML = ''; }
     }
-    rAnlz(true, false);
+}
+
+function renderAnalysisView() {
+    const mealHeaderInput = document.getElementById('meal-report-header-fields');
+    if (mealHeaderInput) {
+      mealHeaderInput.value = st.settings.mealReportHeaderFields || '氏名,性別,年齢,身長,体重,標準体重,収縮期血圧,拡張期血圧,HbA1c,血糖値,運動,飲酒,喫煙';
+    }
+    renderIntegratedItemSelector();
+    renderExtFileList();
+}
+
+function renderMaintView(c) {
+  const makeOpt = (x) => `<option value="${x.id}" style="background:${x.color}; color:#fff;" ${x.id === st.cur ? 'selected' : ''}>${esc(x.name)}</option>`;
+  document.getElementById('sel-f').innerHTML = st.cats.map(makeOpt).join('') || '<option>なし</option>';
+  
+  const csvSel = document.getElementById('csv-sel');
+  if (csvSel) {
+    csvSel.innerHTML = '<option value="all">全カテゴリー一括</option>' + st.cats.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
   }
-  if (st.view === 'maint') {
-    rCat();
-    if (c) rField(c);
-    renderCatIconPalette(); // アイコンパレット初期化
-    renderIoLogs();
-    updateSaveDirectoryStatus();
+
+  rCat();
+  if (c) rField(c);
+  renderCatIconPalette();
+  renderIoLogs();
+  updateSaveDirectoryStatus();
+  renderMaintSettings();
+}
+
+function renderMaintSettings() {
     const backupSwitch = document.getElementById('realtime-backup-switch');
     if (backupSwitch) {
       backupSwitch.checked = !!(st.settings && st.settings.realtimeBackup);
@@ -1813,7 +1830,6 @@ function r()  {
 
     const markerShowSwitch = document.getElementById('graph-marker-show-switch');
     if (markerShowSwitch) {
-      // デフォルトtrue
       markerShowSwitch.checked = (st.settings.graphMarkerShow !== false);
     }
     const markerSizeSlider = document.getElementById('graph-marker-size-slider');
@@ -1849,16 +1865,8 @@ function r()  {
       searchHistorySlider.value = count;
       document.getElementById('search-history-count-value').innerText = count;
     }
-  }
-  if (st.view === 'analysis') {
-    const mealHeaderInput = document.getElementById('meal-report-header-fields');
-    if (mealHeaderInput) {
-      mealHeaderInput.value = st.settings.mealReportHeaderFields || '氏名,性別,年齢,身長,体重,標準体重,収縮期血圧,拡張期血圧,HbA1c,血糖値,運動,飲酒,喫煙';
-    }
-    renderIntegratedItemSelector();
-    renderExtFileList();
-  }
 }
+// ▲▲▲ 変更 ▲▲▲
 
 // テキスト複数入力用ヘルパー
 function addMultiInput(boxId, fid) {
@@ -3226,35 +3234,29 @@ function estimateDailyFrequency(text) {
 // ▲▲▲ 追加 ▲▲▲
 
 // ▼▼▼ 追加: 在庫管理機能 ▼▼▼
-function getStockData() {
-  // 設定初期化
-  if (!st.settings.stockSortKey) st.settings.stockSortKey = 'name';
-  if (st.settings.stockSortAsc === undefined) st.settings.stockSortAsc = true;
-  if (!st.settings.stockPeriodMonths) st.settings.stockPeriodMonths = 3; // デフォルト3ヶ月
+// ▼▼▼ 追加: 病院フィールド特定ヘルパー (複数候補取得) ▼▼▼
+function getHospitalFields(fields) {
+  return fields.filter(f => {
+      const n = f.name.replace(/[\s　]+/g, '');
+      return n.includes('医療機関') || n.includes('病院') || n.includes('クリニック') || n.includes('行先') || n.includes('受診先') || n.includes('薬局');
+  }).sort((a, b) => {
+      const score = (name) => {
+          const n = name.replace(/[\s　]+/g, '');
+          if (n.includes('医療機関') || n.includes('病院') || n.includes('クリニック')) return 3;
+          if (n.includes('行先') || n.includes('受診先')) return 2;
+          return 1;
+      };
+      return score(b.name) - score(a.name);
+  });
+}
 
-  // ▼▼▼ 追加: 病院フィールド特定ヘルパー (複数候補取得) ▼▼▼
-  const getHospitalFields = (fields) => {
-    return fields.filter(f => {
-        const n = f.name.replace(/[\s　]+/g, '');
-        return n.includes('医療機関') || n.includes('病院') || n.includes('クリニック') || n.includes('行先') || n.includes('受診先') || n.includes('薬局');
-    }).sort((a, b) => {
-        const score = (name) => {
-            const n = name.replace(/[\s　]+/g, '');
-            if (n.includes('医療機関') || n.includes('病院') || n.includes('クリニック')) return 3;
-            if (n.includes('行先') || n.includes('受診先')) return 2;
-            return 1;
-        };
-        return score(b.name) - score(a.name);
-    });
-  };
-  // ▲▲▲ 追加 ▲▲▲
-
-  // ▼▼▼ 追加: 通院日情報の収集 ▼▼▼
-  const hospitalMap = {}; // { "病院名": { next: Date, nextNext: Date } }
+// ▼▼▼ 追加: 通院日情報の収集ヘルパー ▼▼▼
+function collectHospitalSchedules(cats) {
+  const hospitalMap = {};
   const cutoffDate = new Date();
   cutoffDate.setHours(0, 0, 0, 0);
-  st.cats.forEach(c => {
-    // ▼▼▼ 変更: 通院日フィールドの特定ロジック改良 ▼▼▼
+
+  cats.forEach(c => {
     const normName = (f) => f.name.replace(/[\s　]+/g, '');
     const candidates = c.fields.filter(f => {
         const n = normName(f);
@@ -3263,29 +3265,19 @@ function getStockData() {
     
     let fNext = null;
     let fNextNext = null;
-
-    // 1. "次次回" を含むものは確実に fNextNext (例: 次次回通院日)
     fNextNext = candidates.find(f => normName(f).includes('次次回'));
-    
-    // 2. "次回" を含むもの (fNextNextとして選ばれたものは除く) (例: 次回通院日)
     const fJikai = candidates.find(f => normName(f).includes('次回') && f !== fNextNext);
-    
-    // 3. "次回"も"次次回"も含まない "通院日" (例: 通院日)
     const fNormal = candidates.find(f => !normName(f).includes('次回') && !normName(f).includes('次次回'));
     
     if (fNormal) {
-        // "通院日" がある場合、それを直近の予定(fNext)とする
         fNext = fNormal;
-        // "通院日" があり、かつ "次回通院日" があるなら、"次回" の方を "次次回(fNextNext)" 扱いとする
         if (fJikai && !fNextNext) fNextNext = fJikai;
     } else {
-        // "通院日" がない場合（従来パターン: "次回通院日" を直近とする）
         if (fJikai) fNext = fJikai;
     }
-    // ▲▲▲ 変更 ▲▲▲
 
-    // 医療機関名を特定するためのフィールドを探す (複数候補)
     const hospitalFields = getHospitalFields(c.fields);
+    const hospitalSchedule = {}; 
     
     const processDates = (rec) => {
         let d1 = fNext ? rec[fNext.id] : null;
@@ -3306,9 +3298,6 @@ function getStockData() {
         return { next: finalNext, nextNext: finalNextNext };
     };
 
-    // ▼▼▼ 変更: 病院情報収集ロジックの改善 (全レコード走査) ▼▼▼
-    const hospitalSchedule = {}; 
-
     c.records.forEach(rec => {
         let hNames = [];
         if (hospitalFields.length > 0) {
@@ -3324,7 +3313,6 @@ function getStockData() {
             if (dates.next) {
                 const nextDate = new Date(dates.next);
                 const current = hospitalSchedule[hName];
-                // 日付がより近い、または同じ日付で次次回情報がある場合（情報量が多い方）を優先して更新
                 if (!current || nextDate < current.next || (nextDate.getTime() === current.next.getTime() && dates.nextNext)) {
                     hospitalSchedule[hName] = {
                         next: nextDate,
@@ -3339,52 +3327,45 @@ function getStockData() {
         hospitalMap[hName] = hospitalSchedule[hName];
     });
   });
-  // ▲▲▲ 追加 ▲▲▲
+  return hospitalMap;
+}
 
-  // 1. 集計: 在庫データを収集
+// ▼▼▼ 追加: 在庫データ収集ヘルパー ▼▼▼
+function collectStockItems(cats, manualStockList, periodMonths) {
   const stockMap = {};
-
-  // 備考データの事前収集
   const remarksMap = {};
   const imagesMap = {};
-  if (st.stock && Array.isArray(st.stock)) {
-    st.stock.forEach(item => {
+  
+  if (manualStockList && Array.isArray(manualStockList)) {
+    manualStockList.forEach(item => {
       if (item.remarks) remarksMap[item.name] = item.remarks;
       if (item.image) imagesMap[item.name] = item.image;
-    });
-  }
-
-  // 1-a. 手動/取込データの反映 (st.stock)
-  if (st.stock && Array.isArray(st.stock)) {
-    st.stock.forEach(item => {
+      
       stockMap[item.name] = {
         name: item.name,
         qty: item.qty || 0,
-        dt: new Date(0), // 優先度低 (1970年)
+        dt: new Date(0),
         catName: '取込/手動',
-        isManual: true, // 手動データフラグ
+        isManual: true,
         remarks: item.remarks || '',
-        hospital: item.hospital || '', // 追加: 病院指定
-        dailyDoseInput: item.dailyDose, // 追加: 1日量指定
-        unit: item.unit || '', // 追加: 単位
-        prescribedDays: item.prescribedDays, // 追加: 処方日数
+        hospital: item.hospital || '',
+        dailyDoseInput: item.dailyDose,
+        unit: item.unit || '',
+        prescribedDays: item.prescribedDays,
         image: item.image || null
       };
     });
   }
   
-  // 指定期間前の日時を計算
   const limitDate = new Date();
-  limitDate.setMonth(limitDate.getMonth() - st.settings.stockPeriodMonths);
+  limitDate.setMonth(limitDate.getMonth() - periodMonths);
 
-  st.cats.forEach(c => {
+  cats.forEach(c => {
     const fDrug = c.fields.find(f => f.name === '薬剤');
     const fStock = c.fields.find(f => f.name === '帳簿在庫数');
-    const hospitalFields = getHospitalFields(c.fields);
     
     if (!fDrug || !fStock) return;
 
-    // レコードを新しい順に走査
     const sortedRecs = c.records.slice().sort((a, b) => getDt(b) - getDt(a));
     
     sortedRecs.forEach(r => {
@@ -3392,31 +3373,22 @@ function getStockData() {
       const stockVal = r[fStock.id];
       if (!drugVal || stockVal === undefined || stockVal === null || stockVal === '') return;
 
-      // 薬剤名のリスト化 (スペース区切り等)
       const drugs = drugVal.split(/[\s,]+/).filter(d => d);
-      
       const rDt = getDt(r);
 
       drugs.forEach(drugName => {
-        // 既に最新の値(レコード由来)が取得済みならスキップ (各薬剤につき最新1件のみ)
         const existing = stockMap[drugName];
         if (existing && !existing.isManual) return;
-
-        // ★変更: 最終更新が指定期間より古い記録は無視する
         if (rDt < limitDate) return;
 
-        // 在庫数のパース
         let qty = null;
         const sStockVal = String(stockVal);
-        // "薬A:10 薬B:20" 形式のチェック
         const escapedName = drugName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        // 正規表現: 名前 + 区切り文字(:=) + 数値
         const match = sStockVal.match(new RegExp(`${escapedName}\\s*[:=]\\s*(-?\\d+(\\.\\d+)?)`));
         
         if (match) {
           qty = parseFloat(match[1]);
         } else if (drugs.length === 1 && /^-?\d+(\.\d+)?$/.test(sStockVal)) {
-          // 薬剤が1つだけで、在庫数が数値のみの場合
           qty = parseFloat(sStockVal);
         }
 
@@ -3428,39 +3400,33 @@ function getStockData() {
             catName: c.name,
             isManual: false,
             remarks: remarksMap[drugName] || '',
-            hospital: (st.stock && st.stock.find(s => s.name === drugName)?.hospital) || '',
-            dailyDoseInput: (st.stock && st.stock.find(s => s.name === drugName)?.dailyDose),
-            unit: (st.stock && st.stock.find(s => s.name === drugName)?.unit) || '',
-            prescribedDays: (st.stock && st.stock.find(s => s.name === drugName)?.prescribedDays),
-            image: imagesMap[drugName] || null,
-            sourceHospital: hospitalFields.reduce((acc, f) => acc || r[f.id], null) // 最初の有効な値を使用
+            hospital: (manualStockList && manualStockList.find(s => s.name === drugName)?.hospital) || '',
+            dailyDoseInput: (manualStockList && manualStockList.find(s => s.name === drugName)?.dailyDose),
+            unit: (manualStockList && manualStockList.find(s => s.name === drugName)?.unit) || '',
+            prescribedDays: (manualStockList && manualStockList.find(s => s.name === drugName)?.prescribedDays),
+            image: imagesMap[drugName] || null
           };
         }
       });
     });
   });
+  return Object.values(stockMap);
+}
 
-  // 2. リスト化 (getStockDataの戻り値)
-  let items = Object.values(stockMap);
-
-  // ▼▼▼ 追加: 予定残薬数・次回処方数の計算 ▼▼▼
+// ▼▼▼ 追加: 予測計算ヘルパー ▼▼▼
+function calculateStockPredictions(items, hospitalMap) {
   items.forEach(item => {
-    // 1日量の決定 (手動入力 > コメントからの推定)
     if (item.dailyDoseInput !== undefined && item.dailyDoseInput !== null && item.dailyDoseInput !== '') {
         item.dailyDose = parseFloat(item.dailyDoseInput);
     } else {
         item.dailyDose = estimateDailyDose(item.remarks);
     }
 
-    item.originalQty = item.qty; // 元の在庫数を保存
-
-    // 最終更新が今日かどうか判定
+    item.originalQty = item.qty;
     const todayStart = new Date();
     todayStart.setHours(0,0,0,0);
     const isUpdatedToday = item.dt >= todayStart;
 
-    // 当日服用分をマイナスして表示する（次回処方調整用）
-    // ※本日更新済みの場合は、既に実在庫が減っているとみなしてマイナスしない
     if (item.dailyDose > 0 && !isUpdatedToday) {
         item.qty = item.qty - item.dailyDose;
         item.qty = parseFloat(item.qty.toFixed(2));
@@ -3469,47 +3435,21 @@ function getStockData() {
     item.estStock = null;
     item.nextPrescription = null;
     item.daysToNext = null;
-    item.matchedHospital = null; // マッチした病院名を保持
+    item.matchedHospital = null;
     item.nextDate = null;
     item.nextNextDate = null;
     item.daysNextToNext = null;
 
     let hospitalName = null;
-    
-    // 1. 手動指定された病院名があれば最優先
     if (item.hospital && hospitalMap[item.hospital]) {
         hospitalName = item.hospital;
-    } 
-    // 2. なければコメント(適用)欄から推測
-    else {
+    } else {
         const normRemarks = (item.remarks || '').replace(/[\s　]+/g, '');
         hospitalName = Object.keys(hospitalMap).find(name => {
             const n = name.replace(/[\s　]+/g, '');
             if (n.length < 2) return false;
             return normRemarks.includes(n) || n.includes(normRemarks);
         });
-    }
-    
-    // 病院名が適用欄にない場合のフォールバック
-    if (!hospitalName) {
-        // 1. 在庫更新元のレコードに病院名が記録されていればそれを使用
-        if (item.sourceHospital) {
-            if (hospitalMap[item.sourceHospital]) {
-                hospitalName = item.sourceHospital;
-            } else {
-                // 部分一致検索 (sourceHospital が mapKey に含まれる、またはその逆)
-                const normSource = item.sourceHospital.replace(/[\s　]+/g, '');
-                const fuzzyKey = Object.keys(hospitalMap).find(k => {
-                    const normK = k.replace(/[\s　]+/g, '');
-                    return normK && (normK.includes(normSource) || normSource.includes(normK));
-                });
-                if (fuzzyKey) hospitalName = fuzzyKey;
-            }
-        }
-        // 2. カテゴリ名が病院マップに存在する場合（病院フィールドがないカテゴリの場合など）
-        else if (item.catName && hospitalMap[item.catName]) {
-            hospitalName = item.catName;
-        }
     }
     
     if (hospitalName) {
@@ -3525,16 +3465,13 @@ function getStockData() {
         const nextDate = new Date(info.next);
         nextDate.setHours(0,0,0,0);
         
-        // 今日から次回通院日までの日数
         const diffTime = nextDate - today;
         const daysToNext = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         item.daysToNext = daysToNext;
         
-        // 予定残薬数 = 現在在庫(当日分引済) - (1日消費 * 日数)
         const consumeDays = Math.max(0, daysToNext);
         item.estStock = item.qty - (item.dailyDose * consumeDays);
         
-        // 次回処方数 = 1日消費 * (次回〜次次回の日数)
         if (info.nextNext) {
             const nextNextDate = new Date(info.nextNext);
             nextNextDate.setHours(0,0,0,0);
@@ -3548,9 +3485,25 @@ function getStockData() {
       }
     }
   });
-  // ▲▲▲ 追加 ▲▲▲
+  return items;
+}
 
-  // 3. ソート
+function getStockData() {
+  // 設定初期化
+  if (!st.settings.stockSortKey) st.settings.stockSortKey = 'name';
+  if (st.settings.stockSortAsc === undefined) st.settings.stockSortAsc = true;
+  if (!st.settings.stockPeriodMonths) st.settings.stockPeriodMonths = 3;
+
+  // 1. 病院スケジュールの収集
+  const hospitalMap = collectHospitalSchedules(st.cats);
+
+  // 2. 在庫データの収集
+  let items = collectStockItems(st.cats, st.stock, st.settings.stockPeriodMonths);
+
+  // 3. 予測計算
+  items = calculateStockPredictions(items, hospitalMap);
+
+  // 4. ソート
   const sortKey = st.settings.stockSortKey;
   const sortAsc = st.settings.stockSortAsc;
   
@@ -3565,8 +3518,6 @@ function getStockData() {
     } else if (sortKey === 'dt') {
       return sortAsc ? a.dt - b.dt : b.dt - a.dt;
     } else {
-      // 数値比較 (qty, estStock)
-      // nullの場合は無限大扱いとして末尾に送る（昇順＝少ない順のとき）
       const numA = (valA !== null && valA !== undefined) ? valA : (sortAsc ? Infinity : -Infinity);
       const numB = (valB !== null && valB !== undefined) ? valB : (sortAsc ? Infinity : -Infinity);
       return sortAsc ? numA - numB : numB - numA;
@@ -3580,21 +3531,6 @@ function rStock() {
   const items = getStockData();
   const sortKey = st.settings.stockSortKey;
   const sortAsc = st.settings.stockSortAsc;
-
-  // ▼▼▼ 追加: 医療機関リストの生成 (選択肢用) ▼▼▼
-  const hospitalCat = st.cats.find(c => c.name.includes('医療機関'));
-  let hospitalOptions = [];
-  if (hospitalCat) {
-    const destField = hospitalCat.fields.find(f => f.name.includes('行先'));
-    if (destField) {
-        // 履歴(options)とレコードの実績値をマージしてユニークにする
-        const opts = (destField.options || []).map(o => typeof o === 'string' ? o : o.text);
-        const recVals = hospitalCat.records.map(r => r[destField.id]).filter(v => v);
-        hospitalOptions = [...new Set([...opts, ...recVals])].sort();
-    }
-  }
-  const hospitalSelectOpts = `<option value="">(自動判定)</option>` + hospitalOptions.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join('');
-  // ▲▲▲ 追加 ▲▲▲
 
   const list = document.getElementById('list-stock');
   
@@ -3669,9 +3605,6 @@ function rStock() {
     
     const safeName = esc(item.name.replace(/'/g, "\\'"));
     const camBoxId = `stock-cam-box-${index}`;
-    const dailyDoseVal = (item.dailyDoseInput !== undefined && item.dailyDoseInput !== null) ? item.dailyDoseInput : '';
-    const unitVal = item.unit || '';
-    const prescribedDaysVal = (item.prescribedDays !== undefined && item.prescribedDays !== null) ? item.prescribedDays : '';
     const imgHtml = item.image 
       ? `<div style="margin:8px 0; text-align:center; position:relative; background:var(--bg-input); border-radius:5px; padding:5px;">
            <img src="${item.image}" style="max-height:120px; max-width:100%; border-radius:4px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.2);" onclick="showImage('${item.image}')">
@@ -3710,24 +3643,6 @@ function rStock() {
       ${imgHtml}
       
       <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #eee;">
-        <div style="display:flex; gap:5px; margin-bottom:5px; flex-wrap:wrap;">
-          <div style="flex:2; min-width:120px;">
-            <label style="font-size:10px; color:var(--text-sub);">病院・診療科</label>
-            <select onchange="updateStockAttribute('${safeName}', 'hospital', this.value)" style="padding:6px; font-size:12px; margin:0;">${hospitalSelectOpts.replace(`value="${esc(item.hospital||'')}"`, `value="${esc(item.hospital||'')}" selected`)}</select>
-          </div>
-          <div style="flex:1; min-width:60px;">
-            <label style="font-size:10px; color:var(--text-sub);">1日量</label>
-            <input type="number" step="0.01" placeholder="自動" value="${dailyDoseVal}" onchange="updateStockAttribute('${safeName}', 'dailyDose', this.value)" style="padding:6px; font-size:12px; margin:0; text-align:right;">
-          </div>
-          <div style="flex:1; min-width:50px;">
-            <label style="font-size:10px; color:var(--text-sub);">単位</label>
-            <input type="text" placeholder="錠" value="${esc(unitVal)}" onchange="updateStockAttribute('${safeName}', 'unit', this.value)" style="padding:6px; font-size:12px; margin:0;">
-          </div>
-          <div style="flex:1; min-width:60px;">
-            <label style="font-size:10px; color:var(--text-sub);">処方日数</label>
-            <input type="number" placeholder="日" value="${prescribedDaysVal}" onchange="updateStockAttribute('${safeName}', 'prescribedDays', this.value)" style="padding:6px; font-size:12px; margin:0; text-align:right;">
-          </div>
-        </div>
       <div style="position:relative;">
         <label style="font-size:10px; color:var(--text-sub);">コメント (旧:適用)</label>
         <textarea placeholder="コメント" data-name="${esc(item.name)}" oninput="autoResize(this)" onchange="updateStockAttribute(this.dataset.name, 'remarks', this.value)" onfocus="showStockHelper(this, '${esc(item.name).replace(/'/g, "\\'")}')" style="width:100%; min-height:3.5em; padding:6px; margin:0; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-main); resize:none; font-family:sans-serif; overflow-y:hidden;">${esc(item.remarks||'')}</textarea>
@@ -3827,7 +3742,7 @@ function showStockPrint() {
             return `
             <tr style="height: 3.5em;">
               <td style="border:1px solid #333; padding:4px; vertical-align:middle; font-size:10px; line-height:1.2;">
-                <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${esc(item.remarks||'')}</div>
+                <div style="white-space: pre-wrap;">${esc(item.remarks||'')}</div>
               </td>
               <td style="border:1px solid #333; padding:1px; vertical-align:middle; text-align:center; white-space:nowrap; font-size:12px; font-weight:bold;">${d1}</td>
               <td style="border:1px solid #333; padding:1px; vertical-align:middle; text-align:center; white-space:nowrap; font-size:12px; font-weight:bold;">${d2}</td>
@@ -7176,11 +7091,18 @@ async function resetApp() {
 
 (async function init() {
   let saved = null;
+  let savedSettings = null;
   window.myExtCharts = [];
+
+  // 1. 最優先データ（カテゴリと設定）のみ並列読み込み
   try {
-    saved = await idb.get(KEY);
-    // 移行処理: IDBになくLocalStorageにある場合
+    [saved, savedSettings] = await Promise.all([
+      idb.get(KEY),
+      idb.get(KEY_SETTINGS)
+    ]);
+
     if (!saved) {
+      // 移行処理: IDBになくLocalStorageにある場合
       const ls = localStorage.getItem(KEY);
       if (ls) {
         try {
@@ -7194,18 +7116,11 @@ async function resetApp() {
   } catch(e) {
     alert('DB Error: ' + e);
   }
+
   if(saved) {
     st.cats = saved;
-    // ログ読み込み
-    try {
-      const l = await idb.get(KEY_LOGS);
-      if(l) st.ioLogs = l;
-      const stk = await idb.get(KEY_STOCK);
-      if(stk) st.stock = stk;
-      const s = await idb.get(KEY_SETTINGS);
-      if(s) st.settings = {...st.settings, ...s};
-      applyTheme(); // テーマ適用
-    } catch(e){}
+    if(savedSettings) st.settings = {...st.settings, ...savedSettings};
+    applyTheme(); // テーマ適用
 
     // ▼▼▼ 追加: テキスト候補のデータ形式移行 ▼▼▼
     let migrated = false;
@@ -7238,29 +7153,6 @@ async function resetApp() {
       });
       delete c.refs; delete c.referenceTables;
     });
-    // 外部データ読み込み
-    try {
-      const savedExt = await idb.get(KEY_EXT);
-      if (savedExt) {
-        if (Array.isArray(savedExt) && savedExt.length > 0 && savedExt[0].data) {
-           // 新形式 (ファイルオブジェクトの配列)
-           st.extFiles = savedExt;
-           const savedIdx = await idb.get(KEY_EXT + '_idx');
-           const idx = (savedIdx !== undefined && savedIdx !== null) ? savedIdx : 0;
-           switchExtFile(idx);
-           renderExtFileList();
-        } else if (Array.isArray(savedExt)) {
-           // 旧形式 (データ配列そのもの) -> 1つのファイルとして移行
-           const fname = await idb.get(KEY_EXT + '_fname') || 'imported_data.csv';
-           const fdate = await idb.get(KEY_EXT + '_fdate') || new Date().toISOString();
-           const sel = await idb.get(KEY_EXT + '_sel') || [];
-           st.extFiles = [{
-              name: fname, date: fdate, data: savedExt, selectedItems: sel
-           }];
-           renderExtFileList();
-        }
-      }
-    } catch(e) { console.error(e); }
   } else {
     st.cats = JSON.parse(JSON.stringify(DEFAULT_DATA));
     st.settings = { realtimeBackup: false, graphHeight: 360, graphLineColor: '#007bff', graphLineWidth: 3, graphMaLineColor: '#ff9800', graphMaLineWidth: 3, graphLatestLineColor: '#ff0000', graphLatestLineWidth: 1, graphDataFontSize: 10, graphAxisFontSize: 10, graphTitleFontSize: 14, graphMinLabelSpacing: 8, graphXAxisInterval: 'auto', waterTarget: 1500, imageMaxWidth: 800, imageQuality: 80, graphMarkerShow: true, graphMarkerSize: 4, searchHistory: [], searchNotHistory: [], searchHistoryCount: 5 };
@@ -7269,7 +7161,7 @@ async function resetApp() {
   }
   if(st.cats.length>0) st.cur = st.cats[0].id;
   cancelCat(); // パレット初期化
-  r();
+  r(); // ★ここで初期描画完了★
 
   // ▼▼▼ デバイス判定を追加 ▼▼▼
   const deviceType = getDeviceType(); // 'pc', 'tablet', 'smartphone'
@@ -7407,58 +7299,50 @@ async function resetApp() {
 
   });
   // ▲▲▲ 追加 ▲▲▲
+
+  // 2. 二次データ（ログ、在庫、外部データ）をバックグラウンドで読み込み
+  try {
+    const [l, stk, savedExt, savedExtIdx, savedExtFname, savedExtFdate, savedExtSel] = await Promise.all([
+      idb.get(KEY_LOGS),
+      idb.get(KEY_STOCK),
+      idb.get(KEY_EXT),
+      idb.get(KEY_EXT + '_idx'),
+      idb.get(KEY_EXT + '_fname'),
+      idb.get(KEY_EXT + '_fdate'),
+      idb.get(KEY_EXT + '_sel')
+    ]);
+
+    if(l) st.ioLogs = l;
+    if(stk) st.stock = stk;
+
+    // 外部データ読み込み・移行
+    if (savedExt) {
+      if (Array.isArray(savedExt) && savedExt.length > 0 && savedExt[0].data) {
+          // 新形式
+          st.extFiles = savedExt;
+          const idx = (savedExtIdx !== undefined && savedExtIdx !== null) ? savedExtIdx : 0;
+          switchExtFile(idx);
+          renderExtFileList();
+      } else if (Array.isArray(savedExt)) {
+          // 旧形式移行
+          const fname = savedExtFname || 'imported_data.csv';
+          const fdate = savedExtFdate || new Date().toISOString();
+          const sel = savedExtSel || [];
+          st.extFiles = [{
+            name: fname, date: fdate, data: savedExt, selectedItems: sel
+          }];
+          renderExtFileList();
+      }
+    }
+
+    // もし初期画面以外（分析画面など）でリロードされた場合は、在庫データ等が読み込まれた後に再描画が必要
+    if (st.view !== 'input') {
+      r();
+    }
+  } catch(e) { console.error('Background data load error:', e); }
 }
 )(); // init end
 
-// ▼▼▼ 追加: アプリ概要表示 ▼▼▼
-function showAppSummary() {
-  const title = '「行動ログ６１０」の概要';
-  const content = `
-    <p style="text-align:right; font-size:12px; color:#666;">日付：2025-12-28</p>
-    <p>このアプリケーション「行動ログ６１０」は、ブラウザ上で動作する個人用データ記録・分析ツールです。 サーバーを必要とせず、HTMLファイル単体で動作し、データはブラウザ内のデータベース（IndexedDB）に保存される仕組みになっています。</p>
-    
-    <h4 style="margin-top:15px; border-bottom:1px solid #eee; padding-bottom:5px;">1. アプリケーションの概要</h4>
-    <ul style="margin-left:20px; font-size:14px; line-height:1.6;">
-      <li><strong>目的:</strong> 日々の行動（排泄、水分補給、服薬など）の記録と、健康状態の可視化・分析。</li>
-      <li><strong>特徴:</strong> インターネット接続がなくても動作し、データはユーザーの端末内にのみ保存されるためプライバシーが守られます。PC、タブレット、スマートフォンそれぞれの画面サイズに対応しています。</li>
-    </ul>
-
-    <h4 style="margin-top:15px; border-bottom:1px solid #eee; padding-bottom:5px;">2. 主要機能（タブ構成）</h4>
-    <div style="font-size:14px; line-height:1.6; margin-left:10px;">
-      <h5>① 記録 (Input)</h5>
-      <p style="margin-left:1em;">日々のデータを入力するメイン画面です。カテゴリー切り替え、テキスト、数値、選択肢、日付、時刻に加え、<strong>カメラ撮影（画像添付）</strong>も可能です。入力補助や在庫連動機能も備わっています。</p>
-      <h5>② 検索 (Search)</h5>
-      <p style="margin-left:1em;">蓄積されたデータをキーワード、日付、カテゴリーで検索・閲覧します。</p>
-      <h5>③ 分析 (Analysis)</h5>
-      <p style="margin-left:1em;">データをグラフや表で可視化します。外部CSVデータの分析や、排便カレンダー、排便状況グラフ、マイラン分析などの内部データ分析が可能です。</p>
-      <h5>④ 在庫 (Stock)</h5>
-      <p style="margin-left:1em;">薬剤などの在庫を管理します。残薬リストの印刷、記録からの自動集計、CSV出力、薬剤マスタの取込ができます。</p>
-      <h5>⑤ 保守 (Maint)</h5>
-      <p style="margin-left:1em;">アプリの設定やデータ管理を行います。カテゴリーや項目のカスタマイズ、JSONでのフルバックアップ・復元、画像の一括出力、在庫連携の診断機能などがあります。</p>
-    </div>
-
-    <h4 style="margin-top:15px; border-bottom:1px solid #eee; padding-bottom:5px;">3. 特徴的なロジック</h4>
-    <ul style="margin-left:20px; font-size:14px; line-height:1.6;">
-      <li><strong>帳簿在庫数の自動計算:</strong> 「在庫区分（使用・補充・棚卸）」と「登録数」から、直前の記録を基に在庫数を自動計算します。</li>
-      <li><strong>IndexedDBの利用:</strong> 大量のデータや画像を扱うため、ブラウザ内蔵の高性能データベースを使用しています。</li>
-      <li><strong>単一ファイル構成:</strong> HTML, CSS, JavaScriptが1つのファイルに統合されており、ファイルのコピーだけでバックアップや移行が完結します。</li>
-    </ul>
-
-    <h4 style="margin-top:15px; border-bottom:1px solid #eee; padding-bottom:5px;">4. 技術スタック</h4>
-    <ul style="margin-left:20px; font-size:14px; line-height:1.6;">
-      <li><strong>言語:</strong> HTML5, CSS3, JavaScript (ES6+)</li>
-      <li><strong>ライブラリ:</strong> Chart.js, chartjs-plugin-datalabels, JSZip</li>
-      <li><strong>データ保存:</strong> IndexedDB (ブラウザ内蔵DB)</li>
-    </ul>
-    
-    <p style="margin-top:15px;">このアプリは、ユーザー自身が使いやすいようにカスタマイズしながら、長期的な健康管理データを安全かつ詳細に記録・分析できるように設計されています。</p>
-  `;
-
-  document.getElementById('modal-title').innerText = title;
-  document.getElementById('modal-body').innerHTML = content;
-  document.getElementById('modal-overlay').style.display = 'flex';
-}
-// ▲▲▲ 追加 ▲▲▲
 
 // ▼▼▼ 追加: 在庫連携診断機能 ▼▼▼
 function debugStockConfig() {
