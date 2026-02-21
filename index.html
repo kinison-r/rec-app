@@ -4288,7 +4288,18 @@ function renderAnalysisList() {
     if (rec._isScheduled) {
        // 予定日がある場合はそれをメインに
        const dow = getDowStr(rec._sortDate);
-       dateHtml = `<span style="color:#0056b3; font-weight:bold;">${formatDateYMD(rec._sortDate)}${dow} <span style="font-size:10px; font-weight:normal; color:#555;">(${rec._sortLabel})</span></span> <span style="font-size:10px; color:#999;">(登録: ${formatDateYMDHM(getDt(rec))})</span>`;
+
+       const today = new Date();
+       today.setHours(0, 0, 0, 0);
+       const target = new Date(rec._sortDate);
+       target.setHours(0, 0, 0, 0);
+       const diffDays = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+       let daysStr = '';
+       if (diffDays === 0) daysStr = ' <span style="color:#dc3545; font-weight:bold;">(今日)</span>';
+       else if (diffDays > 0) daysStr = ` <span style="color:#fd7e14; font-weight:bold;">(あと${diffDays}日)</span>`;
+       else daysStr = ` <span style="color:#666;">(${Math.abs(diffDays)}日前)</span>`;
+
+       dateHtml = `<span style="color:#0056b3; font-weight:bold;">${formatDateYMD(rec._sortDate)}${dow}${daysStr} <span style="font-size:10px; font-weight:normal; color:#555;">(${rec._sortLabel})</span></span> <span style="font-size:10px; color:#999;">(登録: ${formatDateYMDHM(getDt(rec))})</span>`;
     }
     return `
     <div class="rec-row">
