@@ -3020,7 +3020,10 @@ function searchFutureRecords() {
   document.getElementById('anlz-end-date').value = '';
   document.getElementById('srch').value = '';
   if(document.getElementById('srch-cat')) document.getElementById('srch-cat').value = '';
-  rAnlz(true, true, new Date(), true, true);
+  
+  const startOfDay = new Date(today);
+  startOfDay.setHours(0, 0, 0, 0);
+  rAnlz(true, true, startOfDay, true, true);
 }
 
 function checkForgottenItems() {
