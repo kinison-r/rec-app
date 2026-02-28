@@ -3045,6 +3045,7 @@ function checkForgottenItems() {
   
   // 1. 全レコードを走査して、項目の最終利用日時と今日の回数を収集
   st.cats.forEach(c => {
+    if (!c.name.includes('薬剤') && !c.name.includes('薬') && !c.name.includes('サプリ')) return;
     const targetFields = c.fields.filter(f => 
         f.name.includes('薬') || f.name.includes('サプリ') || f.name.includes('在庫') || 
         f.type === 'select' || f.type === 'multi_select'
@@ -3077,6 +3078,7 @@ function checkForgottenItems() {
   const checkTargets = new Set();
   if (st.stock) st.stock.forEach(s => checkTargets.add(s.name));
   st.cats.forEach(c => {
+      if (!c.name.includes('薬剤') && !c.name.includes('薬') && !c.name.includes('サプリ')) return;
       c.fields.forEach(f => {
           if (f.name.includes('薬') || f.name.includes('サプリ')) {
               if (f.options) f.options.forEach(o => checkTargets.add(typeof o === 'string' ? o : o.text));
@@ -4137,23 +4139,29 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sor
     const recDate = getDt(rec);
     // ▼▼▼ 変更: 開始日判定の拡張 (登録日 or 日付項目) ▼▼▼
     if (startDate) {
-      let hit = (recDate >= startDate);
-      // excludeNextVisitがtrue（クイック検索）の場合のみ、日付フィールドも検索対象に含める
-      if (!hit && excludeNextVisit) {
+      let hit = false;
+      if (!excludeNextVisit) {
+        if (recDate >= startDate) hit = true;
+      } else {
+        // クイック検索（予定・未来）: 日付フィールドまたは未来の登録日時を対象
         const dateFields = rec._fs.filter(f => f.type === 'date');
         for (const f of dateFields) {
-          if (excludeNextVisit && f.name && f.name.includes('次回通院日')) continue;
+          if (f.name && f.name.includes('次回通院日')) continue;
           const val = rec[f.id];
           if (val) {
             const d = new Date(val);
             if (!isNaN(d.getTime())) {
-              // 日付項目の場合は「その日の終わり」と比較することで、
-              // 「今日」の予定が現在時刻より前（00:00など）であってもヒットするようにする
               const dEnd = new Date(d);
               dEnd.setHours(23, 59, 59, 999);
               if (dEnd >= startDate) { hit = true; break; }
             }
           }
+        }
+        // 日付フィールドがない場合でも、登録日時が明日以降ならヒットとする
+        if (!hit) {
+           const tomorrow = new Date(startDate);
+           tomorrow.setDate(tomorrow.getDate() + 1);
+           if (recDate >= tomorrow) hit = true;
         }
       }
       if (!hit) return false;
