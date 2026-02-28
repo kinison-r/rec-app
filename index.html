@@ -453,7 +453,6 @@
   <div id="s-input" style="display:none">
     <div class="d-flex gap-1 mb-2" style="align-items: stretch;">
       <select id="sel-in" class="main-sel" style="margin-bottom:0; flex:1;" onchange="st.cur=this.value; cancelEdit(); r(); focusFirstInput();"></select>
-      <button id="btn-mic-cat" class="btn-sub" style="width:50px; background:#17a2b8; font-size:20px; border-radius:10px; padding:0; display:flex; align-items:center; justify-content:center;" onclick="startCatVoiceInput()">🎤</button>
     </div>
     <div id="form-in"></div>
     <div id="list-in"></div>
@@ -523,7 +522,7 @@
       <h2 class="section-title">分析</h2>
       
       <details id="stock-details" style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;" ontoggle="if(this.open) rStock()">
-        <summary style="font-weight:bold; cursor:pointer;">在庫管理</summary>
+        <summary style="font-weight:bold; cursor:pointer;">薬剤在庫管理</summary>
         <div class="mt-2">
           <div id="list-stock"></div>
         </div>
@@ -3421,8 +3420,9 @@ function collectStockItems(cats, manualStockList, periodMonths) {
 // ▼▼▼ 追加: 予測計算ヘルパー ▼▼▼
 function calculateStockPredictions(items, hospitalMap) {
   items.forEach(item => {
-    if (item.dailyDoseInput !== undefined && item.dailyDoseInput !== null && item.dailyDoseInput !== '') {
-        item.dailyDose = parseFloat(item.dailyDoseInput);
+    if (item.dailyDoseInput !== undefined && item.dailyDoseInput !== null) {
+        const parsed = parseFloat(item.dailyDoseInput);
+        item.dailyDose = isNaN(parsed) ? 0 : parsed;
     } else {
         item.dailyDose = estimateDailyDose(item.remarks);
     }
@@ -3609,6 +3609,17 @@ function rStock() {
     }
     
     const safeName = esc(item.name.replace(/'/g, "\\'"));
+    
+    let dailyDoseVal = (item.dailyDose !== undefined && item.dailyDose !== null) ? item.dailyDose : '';
+    if (dailyDoseVal !== '' && Number(dailyDoseVal) % 1 !== 0) { dailyDoseVal = Number(dailyDoseVal).toFixed(2); }
+
+    const dailyDoseHtml = `<div style="display:flex; align-items:center; gap:5px; margin-top:5px; font-size:11px; color:var(--text-sub);">
+        <b>1日使用量:</b>
+        <input type="number" step="0.01" min="0" value="${dailyDoseVal}" 
+          onchange="updateStockAttribute('${safeName}', 'dailyDose', this.value); rStock();"
+          style="width:60px; padding:2px 5px; font-size:12px; border:1px solid var(--border-color); border-radius:4px; text-align:right; background:var(--bg-input); color:var(--text-main);">
+    </div>`;
+
     const camBoxId = `stock-cam-box-${index}`;
     const imgHtml = item.image 
       ? `<div style="margin:8px 0; text-align:center; position:relative; background:var(--bg-input); border-radius:5px; padding:5px;">
@@ -3644,6 +3655,7 @@ function rStock() {
         </div>
       </div>
       ${hospitalInfo}
+      ${dailyDoseHtml}
       ${estInfo}
       ${imgHtml}
       
@@ -3717,6 +3729,7 @@ function showStockPrint() {
             <th style="border:1px solid #333; padding:1px; width:70px; text-align:center;">次回通院日</th>
             <th style="border:1px solid #333; padding:4px; text-align:center; width:80px;">写真</th>
             <th style="border:1px solid #333; padding:4px; text-align:left; width:15%;">薬剤名</th>
+            <th style="border:1px solid #333; padding:4px; width:40px; text-align:right;">1日量</th>
             <th style="border:1px solid #333; padding:4px; width:50px; text-align:right;">帳簿<br>在庫</th>
             <th style="border:1px solid #333; padding:4px; width:50px; text-align:right;">予定<br>残薬</th>
             <th style="border:1px solid #333; padding:4px; width:50px; text-align:right;">次回<br>処方</th>
@@ -3755,6 +3768,13 @@ function showStockPrint() {
               <td style="border:1px solid #333; padding:4px; vertical-align:middle;">
                 <div style="font-weight:bold; word-break:break-all;">${esc(item.name)}</div>
               </td>
+              <td style="border:1px solid #333; padding:4px; vertical-align:middle; text-align:right;">${
+                (() => {
+                  const dose = item.dailyDose;
+                  if (dose === null || dose === undefined) return '-';
+                  return (dose % 1 !== 0) ? dose.toFixed(2) : dose;
+                })()
+              }</td>
               <td style="border:1px solid #333; padding:4px; vertical-align:middle; text-align:right; font-weight:bold;">${item.qty}</td>
               <td style="border:1px solid #333; padding:4px; vertical-align:middle; text-align:right;">${item.estStock !== null ? item.estStock.toFixed(1) : '-'}</td>
               <td style="border:1px solid #333; padding:4px; vertical-align:middle; text-align:right;">${nextPrescriptionDisp}${diffHtml}</td>
@@ -8380,59 +8400,6 @@ function insertAggQuery() {
     aggTargetInput.focus();
   }
   closeModal();
-}
-// ▲▲▲ 追加 ▲▲▲
-
-// ▼▼▼ 追加: カテゴリー音声選択機能 ▼▼▼
-function startCatVoiceInput() {
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    alert('このブラウザは音声認識に対応していません。');
-    return;
-  }
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
-  recognition.lang = 'ja-JP';
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-
-  const btn = document.getElementById('btn-mic-cat');
-  if(btn) {
-      btn.style.background = '#dc3545'; // 録音中は赤く
-      btn.innerText = '👂';
-  }
-  showToast('カテゴリー名を話してください...');
-
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript.trim();
-    // カテゴリー検索 (名前の部分一致などで柔軟に)
-    let match = st.cats.find(c => c.name === transcript) || 
-                st.cats.find(c => transcript.includes(c.name)) || 
-                st.cats.find(c => c.name.includes(transcript));
-
-    if (match) {
-      st.cur = match.id;
-      cancelEdit();
-      r();
-      showToast(`「${match.name}」を選択しました`);
-    } else {
-      showToast(`「${transcript}」は見つかりませんでした`);
-    }
-  };
-
-  recognition.onend = () => { if(btn) { btn.style.background = '#17a2b8'; btn.innerText = '🎤'; } };
-  recognition.onerror = (e) => { 
-    if(btn) { btn.style.background = '#17a2b8'; btn.innerText = '🎤'; } 
-    if(e.error === 'not-allowed') {
-      if (location.protocol === 'file:') {
-        alert('【ローカル環境での制限】\n現在、このファイルをローカル(file://)で開いています。\nChromeなどの主要ブラウザはセキュリティ制限により、ローカルファイルでのマイク使用をブロックします。\n\n音声入力を使用するには、以下のいずれかの方法をお試しください：\n1. VS Codeの「Live Server」等を使って http://localhost で開く\n2. Webサーバーにアップロードして HTTPS でアクセスする');
-      } else {
-        alert('マイクの使用が許可されていません。\n・ブラウザの設定でこのサイトのマイク権限を許可してください。\n・非HTTPS環境では動作しない場合があります。');
-      }
-    } else if(e.error !== 'no-speech') {
-      showToast('エラー: ' + e.error); 
-    }
-  };
-  recognition.start();
 }
 // ▲▲▲ 追加 ▲▲▲
 
