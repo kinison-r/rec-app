@@ -3424,7 +3424,19 @@ function calculateStockPredictions(items, hospitalMap) {
         const parsed = parseFloat(item.dailyDoseInput);
         item.dailyDose = isNaN(parsed) ? 0 : parsed;
     } else {
-        item.dailyDose = estimateDailyDose(item.remarks);
+            let doseCalculated = false;
+            if (item.name.includes('点眼液')) {
+                const remarks = item.remarks || '';
+                const daysMatch = remarks.match(/(\d+)日(?:分|間)/);
+                if (daysMatch) {
+                    const days = parseInt(daysMatch[1]);
+                    item.dailyDose = (days > 0) ? 1 / days : 0;
+                    doseCalculated = true;
+                }
+            }
+            if (!doseCalculated) {
+                item.dailyDose = estimateDailyDose(item.remarks);
+            }
     }
 
     item.originalQty = item.qty;
@@ -3610,14 +3622,20 @@ function rStock() {
     
     const safeName = esc(item.name.replace(/'/g, "\\'"));
     
+    const isEyeDrop = item.name.includes('点眼液');
+    const dailyDoseLabel = isEyeDrop ? '1日使用率:' : '1日使用量:';
+    const inputWidth = isEyeDrop ? '180px' : '60px';
+
     let dailyDoseVal = (item.dailyDose !== undefined && item.dailyDose !== null) ? item.dailyDose : '';
-    if (dailyDoseVal !== '' && Number(dailyDoseVal) % 1 !== 0) { dailyDoseVal = Number(dailyDoseVal).toFixed(2); }
+    if (!isEyeDrop && dailyDoseVal !== '' && Number(dailyDoseVal) % 1 !== 0) { 
+        dailyDoseVal = Number(dailyDoseVal).toFixed(2); 
+    }
 
     const dailyDoseHtml = `<div style="display:flex; align-items:center; gap:5px; margin-top:5px; font-size:11px; color:var(--text-sub);">
-        <b>1日使用量:</b>
-        <input type="number" step="0.01" min="0" value="${dailyDoseVal}" 
+        <b>${dailyDoseLabel}</b>
+        <input type="number" step="any" min="0" value="${dailyDoseVal}" 
           onchange="updateStockAttribute('${safeName}', 'dailyDose', this.value); rStock();"
-          style="width:60px; padding:2px 5px; font-size:12px; border:1px solid var(--border-color); border-radius:4px; text-align:right; background:var(--bg-input); color:var(--text-main);">
+          style="width:${inputWidth}; padding:2px 5px; font-size:12px; border:1px solid var(--border-color); border-radius:4px; text-align:right; background:var(--bg-input); color:var(--text-main);">
     </div>`;
 
     const camBoxId = `stock-cam-box-${index}`;
