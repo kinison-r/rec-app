@@ -41,6 +41,7 @@
       --text-tag: #495057;
       --text-tag-b: #212529;
       --bg-hover: #e2e6ea;
+      --bg-completed: #f0f0f0; /* 追加 */
     }
     body.dark-mode {
       --bg-body: #000000;      /* 背景をより黒くしてコントラスト向上 */
@@ -54,6 +55,7 @@
       --text-tag: #e0e0e0;     /* 項目タグの文字色 */
       --text-tag-b: #ffffff;   /* 項目タグの太字色 */
       --bg-hover: rgba(255, 255, 255, 0.15);
+      --bg-completed: #2a2a2c; /* 追加 */
     }
     /* ▲▲▲ 追加 ▲▲▲ */
     body {
@@ -3014,15 +3016,13 @@ function delF(id) {
 
 // ▼▼▼ 追加: クイック検索・チェック機能 ▼▼▼
 function searchFutureRecords() {
-  const today = new Date();
-  document.getElementById('anlz-start-date').value = formatDateYMD(today);
-  document.getElementById('anlz-end-date').value = '';
+  document.getElementById('anlz-start-date').value = ''; // クリア
+  document.getElementById('anlz-end-date').value = '';   // クリア
   document.getElementById('srch').value = '';
   if(document.getElementById('srch-cat')) document.getElementById('srch-cat').value = '';
   
-  const startOfDay = new Date(today);
-  startOfDay.setHours(0, 0, 0, 0);
-  rAnlz(true, true, startOfDay, true, true);
+  // sortAsc=true (古い順=予定が近い順), excludeNextVisit=true, includePastIncomplete=true
+  rAnlz(true, false, null, true, true, true);
 }
 
 function checkForgottenItems() {
@@ -4091,7 +4091,7 @@ function showStockHistory(name) {
 // ▲▲▲ 追加 ▲▲▲
 
 // 分析・CSV
-function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sortAsc = null, excludeNextVisit = false) {
+function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sortAsc = null, excludeNextVisit = false, includePastIncomplete = false) {
    if (resetPage) {
      st.pagination.analysis = 1;
    }
@@ -4155,71 +4155,6 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sor
     allRecords.push({ ...rec, _cn: c.name, _cid: c.id, _fs: c.fields, _cc: c.color || '#999', _icon: c.icon || '📝' });
   }));
 
-  let filteredRecs = allRecords.filter(rec => {
-    const recDate = getDt(rec);
-    // ▼▼▼ 変更: 開始日判定の拡張 (登録日 or 日付項目) ▼▼▼
-    if (startDate) {
-      let hit = false;
-      if (!excludeNextVisit) {
-        if (recDate >= startDate) hit = true;
-      } else {
-        // クイック検索（予定・未来）: 日付フィールドまたは未来の登録日時を対象
-        const dateFields = rec._fs.filter(f => f.type === 'date');
-        for (const f of dateFields) {
-          if (f.name && f.name.includes('次回通院日')) continue;
-          const val = rec[f.id];
-          if (val) {
-            const d = new Date(val);
-            if (!isNaN(d.getTime())) {
-              const dEnd = new Date(d);
-              dEnd.setHours(23, 59, 59, 999);
-              if (dEnd >= startDate) { hit = true; break; }
-            }
-          }
-        }
-        // 日付フィールドがない場合でも、登録日時が明日以降ならヒットとする
-        if (!hit) {
-           const tomorrow = new Date(startDate);
-           tomorrow.setDate(tomorrow.getDate() + 1);
-           if (recDate >= tomorrow) hit = true;
-        }
-      }
-      if (!hit) return false;
-    }
-    // ▲▲▲ 変更 ▲▲▲
-    if (endDate && recDate > endDate) return false;
-    if (catId && rec._cid !== catId) return false;
-    if (sKeywords.length > 0 || sNotKeywords.length > 0) {
-        let searchableString = rec._cn;
-        rec._fs.forEach(f => {
-            const val = rec[f.id];
-            if (val) {
-              searchableString += ' ' + f.name + ' ' + val;
-              if (f.type === 'file' && rec[f.id + '_name']) searchableString += ' ' + rec[f.id + '_name'];
-              // 値を単語に分割し、それぞれが薬剤名かチェック
-              String(val).toLowerCase().split(/[\s,]+/).forEach(word => {
-                // 薬剤名に一致する適用（備考）があれば検索対象に追加
-                if (remarksMap[word]) searchableString += ' ' + remarksMap[word];
-              });
-            }
-        });
-        const target = searchableString.toLowerCase();
-        
-        // AND/OR検索
-        if (sKeywords.length > 0) {
-          if (searchMode === 'and') {
-            if (!sKeywords.every(k => target.includes(k))) return false;
-          } else { // or
-            if (!sKeywords.some(k => target.includes(k))) return false;
-          }
-        }
-        
-        // 除外検索: いずれかのキーワードを含めば除外
-        if (sNotKeywords.length > 0 && sNotKeywords.some(k => target.includes(k))) return false;
-    }
-    return true;
-  });
-
   // ソート順決定
   let isAsc = false;
   const sortRadioAsc = document.querySelector('input[name="sort-order"][value="asc"]');
@@ -4236,8 +4171,8 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sor
   // ソート用日付情報の計算と付与
   const criterion = startDate ? new Date(startDate) : new Date();
   criterion.setHours(0, 0, 0, 0);
-
-  filteredRecs.forEach(rec => {
+  
+  allRecords.forEach(rec => {
     // 日付フィールドの値を確認
     const dateFields = rec._fs.filter(f => f.type === 'date');
     const validDates = [];
@@ -4250,25 +4185,84 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sor
         }
     });
 
-    // 基準日以降の日付項目があれば、それを優先する
+    // 基準日以降の日付項目（未来）
     const futureDates = validDates.filter(d => {
         const dCheck = new Date(d.date);
         dCheck.setHours(23, 59, 59, 999); // その日の終わりまで含める
         return dCheck >= criterion;
     });
 
+    let bestDate = null;
     if (futureDates.length > 0) {
         // 未来の日付の中で最も直近のものを採用
         futureDates.sort((a, b) => a.date - b.date);
-        rec._sortDate = futureDates[0].date;
-        rec._sortLabel = futureDates[0].label;
+        bestDate = futureDates[0];
+    } else if (includePastIncomplete && validDates.length > 0) {
+        // 未来がなく、かつ過去検索ONなら、過去の日付の中で最も新しいものを採用
+        validDates.sort((a, b) => b.date - a.date);
+        bestDate = validDates[0];
+    }
+
+    if (bestDate) {
+        rec._sortDate = bestDate.date;
+        rec._sortLabel = bestDate.label;
         rec._isScheduled = true;
     } else {
-        // なければ登録日時を使用
         rec._sortDate = getDt(rec);
         rec._sortLabel = '登録日時';
         rec._isScheduled = false;
     }
+  });
+
+  let filteredRecs = allRecords.filter(rec => {
+    // キーワード、カテゴリフィルタ
+    if (catId && rec._cid !== catId) return false;
+    if (sKeywords.length > 0 || sNotKeywords.length > 0) {
+        let searchableString = rec._cn;
+        rec._fs.forEach(f => {
+            const val = rec[f.id];
+            if (val) {
+              searchableString += ' ' + f.name + ' ' + val;
+              if (f.type === 'file' && rec[f.id + '_name']) searchableString += ' ' + rec[f.id + '_name'];
+              String(val).toLowerCase().split(/[\s,]+/).forEach(word => {
+                if (remarksMap[word]) searchableString += ' ' + remarksMap[word];
+              });
+            }
+        });
+        const target = searchableString.toLowerCase();
+        
+        if (sKeywords.length > 0) {
+          if (searchMode === 'and') {
+            if (!sKeywords.every(k => target.includes(k))) return false;
+          } else {
+            if (!sKeywords.some(k => target.includes(k))) return false;
+          }
+        }
+        
+        if (sNotKeywords.length > 0 && sNotKeywords.some(k => target.includes(k))) return false;
+    }
+
+    // 日付フィルタ
+    if (includePastIncomplete) {
+        // 予定日がない記録は除外
+        if (!rec._isScheduled) return false;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const isFuture = rec._sortDate >= today;
+        const isCompleted = !!rec.isCompleted;
+
+        // 過去の完了済み予定は除外
+        if (!isFuture && isCompleted) {
+            return false;
+        }
+    } else {
+        // 通常検索
+        if (startDate && rec._sortDate < startDate) return false;
+        if (endDate && rec._sortDate > endDate) return false;
+    }
+    return true;
   });
 
   if (isAsc) {
@@ -4279,6 +4273,22 @@ function rAnlz(resetPage = false, saveHistory = false, customMinDate = null, sor
 
   analysisRecordsCache = filteredRecs;
 
+  renderAnalysisList();
+}
+
+async function toggleCompletion(catId, recId) {
+  const cat = st.cats.find(c => c.id === catId);
+  if (!cat) return;
+  const rec = cat.records.find(r => r.id === recId);
+  if (!rec) return;
+
+  rec.isCompleted = !rec.isCompleted;
+
+  await save();
+
+  const cachedRec = analysisRecordsCache.find(r => r.id === recId);
+  if (cachedRec) cachedRec.isCompleted = rec.isCompleted;
+  
   renderAnalysisList();
 }
 
@@ -4315,6 +4325,11 @@ function renderAnalysisList() {
   const sRaw = document.getElementById('srch').value.trim();
 
   document.getElementById('list-anlz').innerHTML = countHtml + paginatedRecords.map(rec => {
+    const completedStyle = rec.isCompleted ? `background-color: var(--bg-completed);` : '';
+    const toggleBtnText = rec.isCompleted ? '↩️' : '✔️';
+    const toggleBtnTitle = rec.isCompleted ? '未完了に戻す' : '完了にする';
+    const toggleBtnHtml = `<button class="btn-sub" title="${toggleBtnTitle}" style="align-self: center; padding: 6px 12px; margin: 0 5px;" onclick="event.stopPropagation(); toggleCompletion('${rec._cid}', '${rec.id}')">${toggleBtnText}</button>`;
+
     let dateHtml = formatDateYMDHM(getDt(rec));
     if (rec._isScheduled) {
        // 予定日がある場合はそれをメインに
@@ -4333,7 +4348,7 @@ function renderAnalysisList() {
        dateHtml = `<span style="color:#0056b3; font-weight:bold;">${formatDateYMD(rec._sortDate)}${dow}${daysStr} <span style="font-size:10px; font-weight:normal; color:#555;">(${rec._sortLabel})</span></span> <span style="font-size:10px; color:#999;">(登録: ${formatDateYMDHM(getDt(rec))})</span>`;
     }
     return `
-    <div class="rec-row">
+    <div class="rec-row" style="${completedStyle}">
       <button class="rec-body" onclick="editRec('${rec._cid}','${rec.id}')">
         <small><span class="cat-tag" style="background:${rec._cc}20; color:${rec._cc}; border:1px solid ${rec._cc}40;">${rec._icon} ${highlight(rec._cn, sRaw)}</span> ${dateHtml}</small>
         <div style="margin-top: 4px;">
@@ -4351,6 +4366,7 @@ function renderAnalysisList() {
           }).filter(x => x).join('')}
         </div>
       </button>
+      ${toggleBtnHtml}
     </div>`;
   }).join('');
   
