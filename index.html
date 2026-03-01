@@ -3424,18 +3424,15 @@ function calculateStockPredictions(items, hospitalMap) {
         const parsed = parseFloat(item.dailyDoseInput);
         item.dailyDose = isNaN(parsed) ? 0 : parsed;
     } else {
-            let doseCalculated = false;
-            if (item.name.includes('点眼液')) {
-                const remarks = item.remarks || '';
-                const daysMatch = remarks.match(/(\d+)日(?:分|間)/);
-                if (daysMatch) {
-                    const days = parseInt(daysMatch[1]);
-                    item.dailyDose = (days > 0) ? 1 / days : 0;
-                    doseCalculated = true;
-                }
-            }
-            if (!doseCalculated) {
-                item.dailyDose = estimateDailyDose(item.remarks);
+            const remarks = item.remarks || '';
+            const isEyeDrop = item.name.includes('点眼液');
+            const daysMatch = isEyeDrop ? remarks.match(/(\d+)日(?:分|間)/) : null;
+    
+            if (daysMatch) {
+                const days = parseInt(daysMatch[1]);
+                item.dailyDose = (days > 0) ? 1 / days : 0;
+            } else {
+                item.dailyDose = estimateDailyDose(remarks);
             }
     }
 
@@ -3680,7 +3677,7 @@ function rStock() {
       <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #eee;">
       <div style="position:relative;">
         <label style="font-size:10px; color:var(--text-sub);">コメント (旧:適用)</label>
-        <textarea placeholder="コメント" data-name="${esc(item.name)}" oninput="autoResize(this)" onchange="updateStockAttribute(this.dataset.name, 'remarks', this.value)" onfocus="showStockHelper(this, '${esc(item.name).replace(/'/g, "\\'")}')" style="width:100%; min-height:3.5em; padding:6px; margin:0; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-main); resize:none; font-family:sans-serif; overflow-y:hidden;">${esc(item.remarks||'')}</textarea>
+        <textarea placeholder="コメント" data-name="${esc(item.name)}" oninput="autoResize(this)" onchange="updateStockAttribute(this.dataset.name, 'remarks', this.value); rStock();" onfocus="showStockHelper(this, '${esc(item.name).replace(/'/g, "\\'")}')" style="width:100%; min-height:3.5em; padding:6px; margin:0; font-size:12px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-input); color:var(--text-main); resize:none; font-family:sans-serif; overflow-y:hidden;">${esc(item.remarks||'')}</textarea>
         <div class="stock-helper" style="display:none; background:#f0f8ff; padding:8px; border:1px solid #cce5ff; border-radius:4px; margin-top:5px; z-index:10;"></div>
       </div>
       </div>
@@ -3839,11 +3836,14 @@ function updateStockAttribute(name, key, val) {
   if (!st.stock) st.stock = [];
   let item = st.stock.find(i => i.name === name);
   if (item) {
-    item[key] = val;
+    if (val === '') delete item[key];
+    else item[key] = val;
   } else {
-    const newItem = { id: 's' + Date.now(), name: name, qty: 0 };
-    newItem[key] = val;
-    st.stock.push(newItem);
+    if (val !== '') {
+      const newItem = { id: 's' + Date.now(), name: name, qty: 0 };
+      newItem[key] = val;
+      st.stock.push(newItem);
+    }
   }
   save();
 }
