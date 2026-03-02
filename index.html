@@ -826,8 +826,22 @@
           </div>
 
           <h3 style="font-size:13px; margin-bottom:5px; border-bottom:1px solid #eee;">手動入出力</h3>
+          <div style="margin-top:10px; margin-bottom:10px; border:1px solid #ddd; padding:10px; border-radius:8px; background:#f9f9f9;">
+            <div style="font-size:12px; font-weight:bold; margin-bottom:5px;">出力対象カテゴリー</div>
+            <div style="max-height:120px; overflow-y:auto; border:1px solid #ddd; padding:5px; background:#fff; border-radius:4px; margin-bottom:5px;">
+                <label style="display:block; font-size:12px; font-weight:bold; border-bottom:1px solid #eee; padding-bottom:3px; margin-bottom:3px; cursor:pointer;">
+                  <input type="checkbox" id="exp-cat-all" onchange="toggleExportAll(this.checked)" checked style="vertical-align:middle;"> 全て選択
+                </label>
+                <div id="exp-cat-list"></div>
+            </div>
+            <label style="font-size:12px; display:flex; align-items:center; color:#555; cursor:pointer;">
+                <input type="checkbox" id="exp-include-config" checked style="width:auto; margin-right:5px;"> 設定・在庫・外部データも含める (JSON用)
+            </label>
+            <label style="font-size:12px; display:flex; align-items:center; color:#555; cursor:pointer;">
+                <input type="checkbox" id="exp-structure-only" style="width:auto; margin-right:5px;"> 構造のみ出力 (記録データなし)
+            </label>
+          </div>
           <div class="d-flex gap-1 mt-2" style="flex-wrap:wrap;">
-            <select id="csv-sel" class="flex-2" style="margin:0; font-size:14px; min-width:120px;"></select>
             <button class="btn-main flex-1" style="margin:0; background:#007bff; padding:10px; font-size:14px; min-width:60px;" onclick="expCSV()">CSV</button>
             <button class="btn-main flex-1" style="margin:0; background:#6610f2; padding:10px; font-size:14px; min-width:80px;" onclick="expCSVSplit()">CSV(分割)</button>
             <button class="btn-main flex-1" style="margin:0; background:#17a2b8; padding:10px; font-size:14px; min-width:60px;" onclick="expJSON()">JSON</button>
@@ -1735,10 +1749,7 @@ function renderMaintView(c) {
   const makeOpt = (x) => `<option value="${x.id}" style="background:${x.color}; color:#fff;" ${x.id === st.cur ? 'selected' : ''}>${esc(x.name)}</option>`;
   document.getElementById('sel-f').innerHTML = st.cats.map(makeOpt).join('') || '<option>なし</option>';
   
-  const csvSel = document.getElementById('csv-sel');
-  if (csvSel) {
-    csvSel.innerHTML = '<option value="all">全カテゴリー一括</option>' + st.cats.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
-  }
+  renderExportCatList();
 
   rCat();
   if (c) rField(c);
@@ -1746,6 +1757,24 @@ function renderMaintView(c) {
   renderIoLogs();
   updateSaveDirectoryStatus();
   renderMaintSettings();
+}
+
+function renderExportCatList() {
+  const list = document.getElementById('exp-cat-list');
+  if (!list) return;
+  list.innerHTML = st.cats.map(c => `
+    <label style="display:block; font-size:12px; margin-bottom:2px; cursor:pointer;">
+      <input type="checkbox" class="exp-cat-chk" value="${c.id}" checked style="vertical-align:middle;"> ${esc(c.name)}
+    </label>
+  `).join('');
+}
+function toggleExportAll(checked) {
+  document.querySelectorAll('.exp-cat-chk').forEach(c => c.checked = checked);
+}
+function getSelectedExportCats() {
+  const chks = document.querySelectorAll('.exp-cat-chk:checked');
+  const ids = Array.from(chks).map(c => c.value);
+  return st.cats.filter(c => ids.includes(c.id));
 }
 
 function renderMaintSettings() {
@@ -4479,23 +4508,29 @@ async function saveBlob(blob, name) {
 }
 
 async function expCSV() {
-  const mode = document.getElementById('csv-sel').value;
+  const targetCats = getSelectedExportCats();
+  if (targetCats.length === 0) { alert('カテゴリーが選択されていません'); return; }
+
   let txt = "\uFEFFカテゴリ,日時,内容\n";
-  st.cats.forEach(c => {
-    if(mode !== 'all' && c.id !== mode) return;
+  targetCats.forEach(c => {
     c.records.forEach(r => { const data = c.fields.map(f=>`${f.name}:${r[f.id]||''}`).join('|'); txt += `${c.name},${toJSTISOString(getDt(r))},"${data}"\n`; });
   });
   const blob = new Blob([txt], {type:'text/csv'});
   const ts = getTS();
-  const name = mode === 'all' ? `${VERSION}_${ts}_move_all.csv` : `${VERSION}_${ts}_action_${st.cats.find(x=>x.id===mode).name}.csv`;
+  
+  let nameSuffix = 'selected';
+  if (targetCats.length === st.cats.length) nameSuffix = 'all';
+  else if (targetCats.length === 1) nameSuffix = targetCats[0].name;
+
+  const name = `${VERSION}_${ts}_action_${nameSuffix}.csv`;
   if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 async function expCSVSplit() {
-  const mode = document.getElementById('csv-sel').value;
-  let txt = "\uFEFFカテゴリ,日時,内容\n";
-  st.cats.forEach(c => {
-    if(mode !== 'all' && c.id !== mode) return;
+  const targetCats = getSelectedExportCats();
+  if (targetCats.length === 0) { alert('カテゴリーが選択されていません'); return; }
 
+  let txt = "\uFEFFカテゴリ,日時,内容\n";
+  targetCats.forEach(c => {
     c.records.forEach(r => {
       const dt = toJSTISOString(getDt(r));
       
@@ -4521,25 +4556,49 @@ async function expCSVSplit() {
   });
   const blob = new Blob([txt], {type:'text/csv'});
   const ts = getTS();
-  const catName = mode === 'all' ? 'all' : st.cats.find(x=>x.id===mode).name;
-  const name = `${VERSION}_${ts}_split_${catName}.csv`;
+  
+  let nameSuffix = 'selected';
+  if (targetCats.length === st.cats.length) nameSuffix = 'all';
+  else if (targetCats.length === 1) nameSuffix = targetCats[0].name;
+
+  const name = `${VERSION}_${ts}_split_${nameSuffix}.csv`;
   if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 async function expJSON() {
-  const mode = document.getElementById('csv-sel').value;
+  const targetCats = getSelectedExportCats();
+  if (targetCats.length === 0) { alert('カテゴリーが選択されていません'); return; }
+
+  const includeConfig = document.getElementById('exp-include-config').checked;
+  const structureOnly = document.getElementById('exp-structure-only').checked;
+
+  // 出力用にデータを加工 (構造のみの場合はレコードを空にする)
+  let catsToExport = targetCats;
+  if (structureOnly) {
+    catsToExport = targetCats.map(c => ({ ...c, records: [] }));
+  }
+
   let data;
   let jsonName;
   const ts = getTS();
 
-  if(mode === 'all') {
-    // 全件出力時は、在庫・設定含むフルバックアップ形式にする
-    data = { format: 'full_backup', version: VERSION, cats: st.cats, stock: st.stock || [], settings: st.settings || {}, extFiles: st.extFiles || [] };
-    jsonName = `${VERSION}_${ts}_action_all_full.json`;
+  let nameSuffix = 'selected';
+  if (targetCats.length === st.cats.length) nameSuffix = 'all';
+  else if (targetCats.length === 1) nameSuffix = targetCats[0].name;
+
+  if(includeConfig) {
+    // フルバックアップ形式 (catsは選択分のみ)
+    let stockData = st.stock || [];
+    let extFilesData = st.extFiles || [];
+    if (structureOnly) {
+      stockData = [];
+      extFilesData = [];
+    }
+    data = { format: 'full_backup', version: VERSION, cats: catsToExport, stock: stockData, settings: st.settings || {}, extFiles: extFilesData };
+    jsonName = `${VERSION}_${ts}_action_${nameSuffix}_full${structureOnly ? '_structure' : ''}.json`;
   } else {
-    // 個別出力は従来通りカテゴリー配列（または単体）
-    const c = st.cats.find(x=>x.id===mode);
-    data = c ? [c] : [];
-    jsonName = `${VERSION}_${ts}_action_${c ? c.name : 'unknown'}.json`;
+    // カテゴリ配列のみ
+    data = catsToExport;
+    jsonName = `${VERSION}_${ts}_action_${nameSuffix}${structureOnly ? '_structure' : ''}.json`;
   }
 
   // ZIP圧縮せず直接JSONとして出力（JSZip依存排除・高速化）
@@ -4554,13 +4613,11 @@ async function expJSON() {
 async function expImages() {
   if (!window.JSZip) { alert('JSZipライブラリが読み込まれていません。'); return; }
   document.body.style.cursor = 'wait';
+  const targetCats = getSelectedExportCats();
   try {
     const zip = new JSZip();
     let count = 0;
-    const mode = document.getElementById('csv-sel').value;
-
-    st.cats.forEach(c => {
-      if(mode !== 'all' && c.id !== mode) return;
+    targetCats.forEach(c => {
       // cameraだけでなくfileタイプも含める
       const targetFields = c.fields.filter(f => f.type === 'camera' || f.type === 'file');
       if (targetFields.length === 0) return;
@@ -4602,8 +4659,9 @@ async function expImages() {
       });
     });
 
-    // 在庫画像の出力 (全カテゴリー選択時のみ)
-    if (mode === 'all' && st.stock && Array.isArray(st.stock)) {
+    // 在庫画像の出力 (「設定・在庫含む」チェック時のみ)
+    const includeConfig = document.getElementById('exp-include-config').checked;
+    if (includeConfig && st.stock && Array.isArray(st.stock)) {
       st.stock.forEach(item => {
         if (item.image && typeof item.image === 'string' && item.image.startsWith('data:image')) {
           const safeName = item.name.replace(/[\\/:*?"<>|]/g, '_');
