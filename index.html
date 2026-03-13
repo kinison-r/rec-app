@@ -2736,9 +2736,13 @@ function cancelEdit() {
 function delRec(cid, rid) {
   if (confirm('削除しますか？')) {
     const c = st.cats.find(x => x.id === cid);
-    c.records = c.records.filter(x => x.id !== rid);
-    save();
-    r();
+    if (c) {
+      c.records = c.records.filter(x => x.id !== rid);
+      save();
+      // 検索画面の場合はページ位置を維持してリストを更新
+      if (st.view === 'search') rAnlz(false);
+      else r();
+    }
   }
 }
 
@@ -4376,6 +4380,7 @@ function renderAnalysisList() {
     const toggleBtnText = rec.isCompleted ? '↩️' : '✔️';
     const toggleBtnTitle = rec.isCompleted ? '未完了に戻す' : '完了にする';
     const toggleBtnHtml = `<button class="btn-sub" title="${toggleBtnTitle}" style="align-self: center; padding: 6px 12px; margin: 0 5px;" onclick="event.stopPropagation(); toggleCompletion('${rec._cid}', '${rec.id}')">${toggleBtnText}</button>`;
+    const deleteBtnHtml = `<button class="del-btn" onclick="event.stopPropagation(); delRec('${rec._cid}', '${rec.id}')">削除</button>`;
 
     let dateHtml = formatDateYMDHM(getDt(rec));
     if (rec._isScheduled) {
@@ -4414,6 +4419,7 @@ function renderAnalysisList() {
         </div>
       </button>
       ${toggleBtnHtml}
+      ${deleteBtnHtml}
     </div>`;
   }).join('');
   
