@@ -726,6 +726,25 @@
       </details>
 
       <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
+        <summary style="font-weight:bold; cursor:pointer;">薬剤グループ設定</summary>
+        <div class="mt-2">
+          <p style="font-size:11px; color:var(--text-sub); margin-bottom:10px;">
+            よく使う薬剤のセットを登録できます。記録画面でワンタップで複数の薬剤を入力できるようになります。
+          </p>
+          <div id="list-drug-groups"></div>
+          <div class="list-add-row" style="flex-direction:column; background:var(--bg-input); padding:10px; border-radius:5px;">
+             <input id="dg-name" placeholder="グループ名 (例: 朝セット)" style="margin-bottom:5px;">
+             <textarea id="dg-items" placeholder="薬剤名 (スペース区切りで入力)" style="width:100%; min-height:60px; font-family:monospace; margin-bottom:5px;" oninput="autoResize(this); renderDrugGroupHelpers();"></textarea>
+             <div id="dg-helpers" class="mt-2"></div>
+             <div style="text-align:right;">
+               <button id="btn-dg-cancel" class="btn-sub" style="display:none; background:#6c757d; margin-right:5px; height:auto; padding:8px 16px;" onclick="cancelDrugGroupEdit()">キャンセル</button>
+               <button id="btn-dg-save" class="btn-sub" style="background:#28a745; height:auto; padding:8px 16px;" onclick="addDrugGroup()">グループ追加</button>
+             </div>
+          </div>
+        </div>
+      </details>
+
+      <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
         <summary style="font-weight:bold; cursor:pointer;">項目設定</summary>
         <div class="mt-2">
           <select id="sel-f" class="main-sel" onchange="st.cur=this.value; st.editF=null; st.editRef=null; r();"></select>
@@ -1042,7 +1061,8 @@ let st = {
   extTableSort: { col: 'date', asc: false },
   analysisSelection: new Set(),
   pagination: { input: {}, analysis: 1 },
-  debugLogs: []
+  debugLogs: [],
+  editDrugGroupIdx: null
 };
 let analysisRecordsCache = [];
 const RECS_PER_PAGE = 20;
@@ -1700,6 +1720,8 @@ function renderMaintView(c) {
   renderIoLogs();
   updateSaveDirectoryStatus();
   renderMaintSettings();
+  renderDrugGroups();
+  renderDrugGroupHelpers();
 }
 
 function renderExportCatList() {
@@ -1943,6 +1965,18 @@ function rIn(c) {
             h += `<button type="button" class="btn-sub option-btn${selClass}" data-fid="${f.id}" onclick="selectOption('${f.id}', '${esc(t)}', this)" style="padding:10px; flex:1; min-width:80px;">${esc(t)}</button>`;
         });
         h += `</div>`;
+        // ▼▼▼ 追加: 薬剤グループ入力ボタン (select用) ▼▼▼
+        // 在庫区分フィールドでは重複するため表示しない
+        if (st.settings.drugGroups && st.settings.drugGroups.length > 0 && f.name !== '在庫区分') {
+            h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
+            h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
+            h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
+            st.settings.drugGroups.forEach(g => {
+                h += `<button type="button" class="btn-sub" style="background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe; white-space:nowrap;" onclick="applyDrugGroup('${f.id}', '${esc(g.items)}')">${esc(g.name)}</button>`;
+            });
+            h += `</div></div>`;
+        }
+        // ▲▲▲ 追加 ▲▲▲
         break;
       case 'multi_select':
         let mItems = f.options || [];
@@ -1957,6 +1991,18 @@ function rIn(c) {
             h += `<button type="button" class="btn-sub option-btn${selClass}" onclick="toggleMultiOption('${f.id}', '${esc(t)}', this)" style="padding:10px; flex:1; min-width:80px;">${esc(t)}</button>`;
         });
         h += `</div>`;
+        // ▼▼▼ 追加: 薬剤グループ入力ボタン (multi_select用) ▼▼▼
+        // 在庫区分フィールドでは重複するため表示しない
+        if (st.settings.drugGroups && st.settings.drugGroups.length > 0 && f.name !== '在庫区分') {
+            h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
+            h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
+            h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
+            st.settings.drugGroups.forEach(g => {
+                h += `<button type="button" class="btn-sub" style="background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe; white-space:nowrap;" onclick="applyDrugGroup('${f.id}', '${esc(g.items)}')">${esc(g.name)}</button>`;
+            });
+            h += `</div></div>`;
+        }
+        // ▲▲▲ 追加 ▲▲▲
         break;
       case 'text':
         const vals = val ? String(val).split(' ') : [''];
@@ -1981,10 +2027,32 @@ function rIn(c) {
             });
             h += `</div></div>`;
         }
+        // ▼▼▼ 追加: 薬剤グループ入力ボタン ▼▼▼
+        if (st.settings.drugGroups && st.settings.drugGroups.length > 0) {
+            h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
+            h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
+            h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
+            st.settings.drugGroups.forEach(g => {
+                h += `<button type="button" class="btn-sub" style="background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe; white-space:nowrap;" onclick="applyDrugGroup('${f.id}', '${esc(g.items)}')">${esc(g.name)}</button>`;
+            });
+            h += `</div></div>`;
+        }
+        // ▲▲▲ 追加 ▲▲▲
         // ▲▲▲ 変更 ▲▲▲
         break;
       case 'simple_text':
         h += `<textarea id="i-${f.id}" rows="1" oninput="autoResize(this)" style="resize:none; min-height:40px;">${esc(val)}</textarea>`;
+        // ▼▼▼ 追加: 薬剤グループ入力ボタン (simple_text用) ▼▼▼
+        if (st.settings.drugGroups && st.settings.drugGroups.length > 0) {
+            h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
+            h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
+            h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
+            st.settings.drugGroups.forEach(g => {
+                h += `<button type="button" class="btn-sub" style="background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe; white-space:nowrap;" onclick="applyDrugGroup('${f.id}', '${esc(g.items)}')">${esc(g.name)}</button>`;
+            });
+            h += `</div></div>`;
+        }
+        // ▲▲▲ 追加 ▲▲▲
         break;
       case 'number':
         h += `<input type="number" id="i-${f.id}" value="${esc(val)}">`;
@@ -7145,6 +7213,325 @@ if (formInEl) {
   formInEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.matches('input')) { e.preventDefault(); moveFocusToNext(e.target); }
   });
+}
+
+// ▼▼▼ 追加: 薬剤グループ管理機能 ▼▼▼
+function renderDrugGroups() {
+  const list = document.getElementById('list-drug-groups');
+  if (!list) return;
+  const groups = st.settings.drugGroups || [];
+  
+  if (groups.length === 0) {
+    list.innerHTML = '<div style="color:#666; font-size:12px; padding:5px; text-align:center;">グループが設定されていません</div>';
+  } else {
+    list.innerHTML = groups.map((g, i) => `
+      <div class="card" style="padding:10px; margin-bottom:5px; border:1px solid var(--border-color); ${st.editDrugGroupIdx === i ? 'border:2px solid #007bff; background:#f0f8ff;' : ''}">
+        <div style="font-weight:bold; font-size:14px; margin-bottom:5px;">${esc(g.name)}</div>
+        <div style="font-size:12px; color:var(--text-sub); word-break:break-all; background:var(--bg-tag); padding:5px; border-radius:4px;">${esc(g.items)}</div>
+        <div style="text-align:right; margin-top:5px;">
+           <button class="btn-sub" onclick="editDrugGroup(${i})">編集</button>
+           <button class="btn-sub" style="background:#dc3545;" onclick="delDrugGroup(${i})">削除</button>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+function addDrugGroup() {
+  const nameIn = document.getElementById('dg-name');
+  const itemsIn = document.getElementById('dg-items');
+  const name = nameIn.value.trim();
+  const items = itemsIn.value.trim();
+  
+  if (!name || !items) { alert('グループ名と薬剤名を入力してください'); return; }
+  if (!st.settings.drugGroups) st.settings.drugGroups = [];
+  
+  if (st.editDrugGroupIdx !== null && st.editDrugGroupIdx >= 0) {
+    // 更新
+    if (st.editDrugGroupIdx < st.settings.drugGroups.length) {
+        st.settings.drugGroups[st.editDrugGroupIdx] = { name: name, items: items };
+    }
+    st.editDrugGroupIdx = null;
+    document.getElementById('btn-dg-save').innerText = 'グループ追加';
+    document.getElementById('btn-dg-cancel').style.display = 'none';
+  } else {
+    // 新規
+    st.settings.drugGroups.push({ name: name, items: items });
+  }
+  
+  saveSettings();
+  nameIn.value = '';
+  itemsIn.value = '';
+  renderDrugGroups();
+  renderDrugGroupHelpers();
+}
+
+function editDrugGroup(idx) {
+  const groups = st.settings.drugGroups || [];
+  if (idx < 0 || idx >= groups.length) return;
+  
+  const g = groups[idx];
+  document.getElementById('dg-name').value = g.name;
+  document.getElementById('dg-items').value = g.items;
+  
+  st.editDrugGroupIdx = idx;
+  document.getElementById('btn-dg-save').innerText = '更新保存';
+  document.getElementById('btn-dg-cancel').style.display = 'inline-block';
+  renderDrugGroups(); // ハイライト更新のため
+  renderDrugGroupHelpers();
+  
+  // フォームへスクロール
+  document.getElementById('dg-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelDrugGroupEdit() {
+  st.editDrugGroupIdx = null;
+  document.getElementById('dg-name').value = '';
+  document.getElementById('dg-items').value = '';
+  document.getElementById('btn-dg-save').innerText = 'グループ追加';
+  document.getElementById('btn-dg-cancel').style.display = 'none';
+  renderDrugGroups();
+  renderDrugGroupHelpers();
+}
+
+function delDrugGroup(idx) {
+  if (!confirm('このグループを削除しますか？')) return;
+  if (!st.settings.drugGroups) return;
+  
+  // 削除時は編集モード解除
+  cancelDrugGroupEdit();
+  
+  st.settings.drugGroups.splice(idx, 1);
+  saveSettings();
+  renderDrugGroups();
+}
+
+function applyDrugGroup(fid, itemsStr) {
+  const c = st.cats.find(x => x.id === st.cur);
+  if (!c) return;
+
+  // 在庫管理用の必須フィールドがあるかチェック
+  const fDrug = c.fields.find(f => f.name === '薬剤');
+  const fType = c.fields.find(f => f.name === '在庫区分');
+  const fAmount = c.fields.find(f => f.name === '登録数');
+  const fStock = c.fields.find(f => f.name === '帳簿在庫数');
+
+  // 必須フィールドが揃っている場合は、自動記録作成モードとして動作
+  if (fDrug && fType && fAmount && fStock) {
+    applyDrugGroupAndCreateRecords(itemsStr);
+    return;
+  }
+
+  const itemsToAdd = itemsStr.split(/[\s　,]+/).filter(x => x);
+  if (itemsToAdd.length === 0) return;
+
+  // Check if it's a multi-input text field (type: 'text')
+  const box = document.getElementById(`box-${fid}`);
+  const hiddenInput = document.getElementById(`i-${fid}`);
+  const selGrp = document.getElementById(`sel-grp-${fid}`);
+
+  if (box) {
+      itemsToAdd.forEach(item => {
+        addTextFromOption(fid, item);
+      });
+  } else if (hiddenInput && selGrp) {
+      // select または multi_select の場合
+      let currentVals = hiddenInput.value ? hiddenInput.value.split(' ').filter(v=>v) : [];
+      let changed = false;
+      itemsToAdd.forEach(val => {
+          if (!currentVals.includes(val)) {
+              currentVals.push(val);
+              changed = true;
+          }
+      });
+      if (changed) {
+          hiddenInput.value = currentVals.join(' ');
+          // UI更新（該当する選択肢ボタンをハイライト）
+          selGrp.querySelectorAll('.option-btn').forEach(btn => { if (currentVals.includes(btn.innerText.trim())) btn.classList.add('selected-btn'); });
+          hiddenInput.dispatchEvent(new Event('change', {bubbles: true}));
+      }
+  } else {
+      // Assume it's a simple textarea (type: 'simple_text')
+      const textarea = document.getElementById(`i-${fid}`);
+      if (textarea && textarea.tagName === 'TEXTAREA') {
+          const currentItems = textarea.value.trim() ? textarea.value.trim().split(/[\s　,]+/) : [];
+          const newItems = itemsToAdd.filter(item => !currentItems.includes(item));
+          textarea.value = [...currentItems, ...newItems].join(' ');
+          autoResize(textarea);
+      }
+  }
+  showToast(`グループを展開しました: ${itemsToAdd.length}件`);
+}
+
+function estimateUnitAmountFromRemarks(remarks) {
+    if (!remarks) return 1;
+    const t = String(remarks).replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/[\s　]+/g, '');
+    
+    // "1回X錠/単位" のパターンを探す
+    const match = t.match(/1回(\d+(\.\d+)?)/);
+    if (match && match[1]) {
+        return parseFloat(match[1]);
+    }
+    
+    // "朝夕1錠" のようなパターン
+    const match2 = t.match(/(?:朝|昼|夕|晩|寝る前|毎食後)(\d+(\.\d+)?)[錠包個mgmL単位瓶]/);
+    if (match2 && match2[1]) {
+        return parseFloat(match2[1]);
+    }
+    return 1;
+}
+
+async function applyDrugGroupAndCreateRecords(itemsStr) {
+  const c = st.cats.find(x => x.id === st.cur);
+  if (!c) { alert('カテゴリーが選択されていません。'); return; }
+
+  const fDrug = c.fields.find(f => f.name === '薬剤');
+  const fType = c.fields.find(f => f.name === '在庫区分');
+  const fAmount = c.fields.find(f => f.name === '登録数');
+  const fStock = c.fields.find(f => f.name === '帳簿在庫数');
+
+  const items = itemsStr.split(/[\s　,]+/).filter(x => x);
+  if (items.length === 0) return;
+
+  if (!confirm(`${items.length}件の使用記録を自動作成しますか？`)) return;
+
+  document.body.style.cursor = 'wait';
+
+  let createdCount = 0;
+  for (const drugName of items) {
+    const stockItem = (st.stock || []).find(s => s.name === drugName);
+    const isEyeDrop = drugName.includes('点眼液');
+    let unitAmount = 0;
+    let newStockValue;
+
+    if (isEyeDrop) {
+      // 点眼液の場合、登録数は空にし、在庫計算では0として扱う
+      newStockValue = calculateNewStock(c, drugName, '使用', 0);
+    } else {
+      // 点眼液以外は通常通り
+      unitAmount = estimateUnitAmountFromRemarks(stockItem?.remarks);
+      newStockValue = calculateNewStock(c, drugName, '使用', unitAmount);
+    }
+
+    const newRec = {
+      id: 'r' + Date.now() + Math.random().toString(36).substr(2, 5),
+      dt: toJSTISOString(new Date()),
+      [fDrug.id]: drugName,
+      [fType.id]: '使用',
+      [fStock.id]: newStockValue
+    };
+    if (!isEyeDrop) {
+      newRec[fAmount.id] = unitAmount;
+    }
+
+    c.records.unshift(newRec);
+    createdCount++;
+  }
+
+  c.records.sort((a, b) => getDt(b) - getDt(a));
+  await save();
+  r();
+  
+  document.body.style.cursor = 'default';
+  showToast(`${createdCount}件の記録を作成しました。`);
+}
+
+function calculateNewStock(cat, drugNameToUpdate, type, amount) {
+  const fDrug = cat.fields.find(f => f.name === '薬剤');
+  const fStock = cat.fields.find(f => f.name === '帳簿在庫数');
+  if (!fDrug || !fStock) return 0;
+
+  let latestStockRecord = null;
+  for (const r of cat.records) {
+    const rStockVal = r[fStock.id];
+    if (rStockVal !== undefined && rStockVal !== null && rStockVal !== '') {
+      latestStockRecord = r;
+      break;
+    }
+  }
+
+  const stockMap = {};
+  if (latestStockRecord) {
+      const prevDrugs = (latestStockRecord[fDrug.id] || '').split(/[\s　,]+/).filter(x => x);
+      Object.assign(stockMap, parseStockValue(latestStockRecord[fStock.id], prevDrugs));
+  }
+
+  let prevStockForDrug = stockMap[drugNameToUpdate];
+  if (prevStockForDrug === undefined) {
+      for (const r of cat.records) {
+          if (r === latestStockRecord) continue;
+          const rDrugVal = r[fDrug.id] || '';
+          if (rDrugVal.includes(drugNameToUpdate)) {
+              const tempMap = parseStockValue(r[fStock.id], [drugNameToUpdate]);
+              if (tempMap[drugNameToUpdate] !== undefined) {
+                  prevStockForDrug = tempMap[drugNameToUpdate];
+                  break;
+              }
+          }
+      }
+      if (prevStockForDrug === undefined) prevStockForDrug = 0;
+  }
+
+  let newStockForDrug = 0;
+  const numAmount = parseFloat(amount) || 0;
+  if (type === '使用') newStockForDrug = prevStockForDrug - numAmount;
+  else if (type === '補充') newStockForDrug = prevStockForDrug + numAmount;
+  else if (type === '棚卸') newStockForDrug = numAmount;
+  else newStockForDrug = prevStockForDrug;
+  
+  return parseFloat(newStockForDrug.toFixed(6));
+}
+
+// ▼▼▼ 追加: 薬剤グループ入力支援機能 ▼▼▼
+function renderDrugGroupHelpers() {
+  const container = document.getElementById('dg-helpers');
+  if (!container) return;
+
+  // 1. 薬剤リストの収集
+  const allDrugs = new Set();
+  // a. 在庫管理から
+  if (st.stock && st.stock.length > 0) {
+    st.stock.forEach(item => allDrugs.add(item.name));
+  }
+  // b. カテゴリーの選択肢から
+  st.cats.forEach(c => {
+    if (c.name.includes('薬') || c.name.includes('剤') || c.name.includes('サプリ')) {
+      c.fields.forEach(f => {
+        if ((f.type === 'select' || f.type === 'multi_select' || f.type === 'text') && f.options) {
+          f.options.forEach(opt => {
+            const name = typeof opt === 'string' ? opt : opt.text;
+            if (name) allDrugs.add(name);
+          });
+        }
+      });
+    }
+  });
+
+  const sortedDrugs = Array.from(allDrugs).sort((a, b) => a.localeCompare(b, 'ja'));
+  if (sortedDrugs.length === 0) { container.innerHTML = ''; return; }
+
+  // 2. 現在入力中の薬剤を取得
+  const itemsIn = document.getElementById('dg-items');
+  const currentItems = new Set(itemsIn.value.trim().split(/[\s　,]+/).filter(x => x));
+
+  // 3. HTML生成
+  let html = `<div style="border-top: 1px dashed var(--border-color); padding-top: 10px;"><label style="font-size:11px; color:var(--text-sub);">クリックして薬剤を追加/削除:</label><div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; max-height: 200px; overflow-y: auto; background: var(--bg-body); padding: 8px; border-radius: 5px; border: 1px solid var(--border-color);">`;
+  sortedDrugs.forEach(drug => {
+    const isSelected = currentItems.has(drug);
+    html += `<button type="button" class="btn-sub option-btn ${isSelected ? 'selected-btn' : ''}" onclick="toggleDrugInGroupInput('${esc(drug)}')">${esc(drug)}</button>`;
+  });
+  html += `</div></div>`;
+  container.innerHTML = html;
+}
+
+function toggleDrugInGroupInput(drugName) {
+  const itemsIn = document.getElementById('dg-items');
+  let currentItems = new Set(itemsIn.value.trim().split(/[\s　,]+/).filter(x => x));
+  if (currentItems.has(drugName)) currentItems.delete(drugName);
+  else currentItems.add(drugName);
+  itemsIn.value = Array.from(currentItems).join(' ');
+  autoResize(itemsIn);
+  renderDrugGroupHelpers(); // ボタンの選択状態を更新
 }
 // ▲▲▲ 追加 ▲▲▲ 
 </script>
