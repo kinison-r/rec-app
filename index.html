@@ -845,17 +845,6 @@
       </details>
 
       <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
-        <summary style="font-weight:bold; cursor:pointer;">カレンダー設定</summary>
-        <div class="mt-2">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
-             <label for="water-target-num" style="margin:0;">目標水分量 (ml):</label>
-             <input type="number" id="water-target-num" min="0" max="5000" step="50" value="1500" style="width:80px; padding:5px; text-align:right;" oninput="updateWaterTarget(this.value)">
-          </div>
-          <input type="range" id="water-target-slider" min="500" max="3000" step="50" value="1500" style="width:100%;" oninput="updateWaterTarget(this.value)">
-        </div>
-      </details>
-
-      <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
         <summary style="font-weight:bold; cursor:pointer;">画像設定 (カメラ)</summary>
         <div class="mt-2">
           <label for="img-max-width-slider">最大画像幅: <span id="img-max-width-value">800</span>px</label>
@@ -1663,14 +1652,6 @@ function renderMaintSettings() {
       const freq = (st.settings && st.settings.backupFrequency) || 1;
       backupFreqSlider.value = freq;
       document.getElementById('backup-freq-value').innerText = freq;
-    }
-
-    const waterTargetNum = document.getElementById('water-target-num');
-    const waterTargetSlider = document.getElementById('water-target-slider');
-    if (waterTargetNum && waterTargetSlider) {
-      const target = st.settings.waterTarget || 1500;
-      waterTargetNum.value = target;
-      waterTargetSlider.value = target;
     }
 
     const imgWidthSlider = document.getElementById('img-max-width-slider');
@@ -4638,8 +4619,8 @@ function makeCalHTML(y, m) {
       });
     }
   }
-  let okCnt = 0, ngCnt = 0;
-  Object.values(res).forEach(v => { if(v) okCnt++; else if(v===false) ngCnt++; });
+  let okCnt = 0;
+  Object.values(res).forEach(v => { if (v) okCnt++; });
   
   const water = {};
   const waterCats = st.cats.filter(c => c.name.includes('水分') || c.name.includes('飲'));
@@ -4665,6 +4646,20 @@ function makeCalHTML(y, m) {
   });
 
   const first = new Date(y, m-1, 1).getDay(); const last = new Date(y, m, 0).getDate();
+  let ngCnt;
+  const today = new Date();
+  if (y === today.getFullYear() && m === today.getMonth() + 1) {
+    const todayD = today.getDate();
+    let okCntUntilToday = 0;
+    for (let day = 1; day <= todayD; day++) {
+      if (res[day] === true) {
+        okCntUntilToday++;
+      }
+    }
+    ngCnt = todayD - okCntUntilToday;
+  } else {
+    ngCnt = last - okCnt;
+  }
   let h = '<table style="width:100%; border-collapse:collapse; text-align:center; table-layout:fixed; border:2px solid #444;">';
   h += '<tr style="background:#eee; font-size:12px; border-bottom:2px solid #444;"><th style="color:red; border-right:2px solid #444;">日</th><th style="border-right:2px solid #444;">月</th><th style="border-right:2px solid #444;">火</th><th style="border-right:2px solid #444;">水</th><th style="border-right:2px solid #444;">木</th><th style="border-right:2px solid #444;">金</th><th style="color:blue">土</th></tr><tr>';
   let d = 1; for(let i=0; i<first; i++) h += '<td style="border-right:2px solid #444; border-bottom:2px solid #444;"></td>';
@@ -4687,7 +4682,7 @@ function makeCalHTML(y, m) {
   for(let i=first; i<7; i++) { if(d<=last) { h+=cell(d); d++; } } h+='</tr>';
   while(d<=last) { h+='<tr>'; for(let i=0; i<7; i++) { if(d<=last) { h+=cell(d); d++; } else { h+='<td style="border-right:2px solid #444; border-bottom:2px solid #444;"></td>'; } } h+='</tr>'; }
   h += '</table>';
-  h += `<div style="font-size:11px; margin-top:5px; text-align:right; color:#666;">凡例: <span style="color:#6f42c1;font-weight:bold;">☑</span>出た(${okCnt}日) <span style="color:#dc3545;font-weight:bold;">☒</span>出ない(${ngCnt}日) <span style="color:#007bff;">OK</span>/<span style="color:#dc3545;">不足</span>(目標${waterTarget}ml)</div>`;
+  h += `<div style="font-size:11px; margin-top:5px; text-align:right; color:#666;">凡例: <span style="color:#6f42c1;font-weight:bold;">☑</span>出た(${okCnt}日) <span style="color:#dc3545;font-weight:bold;">☒</span>出ない(${ngCnt}日)</div>`;
   return h;
 }
 
