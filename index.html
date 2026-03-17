@@ -793,9 +793,9 @@
           <h3 style="font-size:13px; margin-bottom:5px; border-bottom:1px solid #eee;">手動入出力</h3>
           <div style="margin-top:10px; margin-bottom:10px; border:1px solid #ddd; padding:10px; border-radius:8px; background:#f9f9f9;">
             <div style="font-size:12px; font-weight:bold; margin-bottom:5px;">出力対象カテゴリー</div>
-            <div style="max-height:120px; overflow-y:auto; border:1px solid #ddd; padding:5px; background:#fff; border-radius:4px; margin-bottom:5px;">
-                <label style="display:block; font-size:12px; font-weight:bold; border-bottom:1px solid #eee; padding-bottom:3px; margin-bottom:3px; cursor:pointer;">
-                  <input type="checkbox" id="exp-cat-all" onchange="toggleExportAll(this.checked)" checked style="vertical-align:middle;"> 全て選択
+            <div style="height:150px; resize:vertical; overflow-y:auto; border:1px solid #ddd; padding:2px 5px; background:#fff; border-radius:4px; margin-bottom:5px;">
+                <label style="display:flex; align-items:center; font-size:12px; font-weight:bold; border-bottom:1px solid #eee; padding:2px 0; margin-bottom:0; cursor:pointer; position:sticky; top:0; background:#fff; z-index:1; white-space:nowrap;">
+                  <input type="checkbox" id="exp-cat-all" onchange="toggleExportAll(this.checked)" checked style="margin-right:4px; flex-shrink:0;"> 全て選択
                 </label>
                 <div id="exp-cat-list"></div>
             </div>
@@ -852,81 +852,6 @@
              <input type="number" id="water-target-num" min="0" max="5000" step="50" value="1500" style="width:80px; padding:5px; text-align:right;" oninput="updateWaterTarget(this.value)">
           </div>
           <input type="range" id="water-target-slider" min="500" max="3000" step="50" value="1500" style="width:100%;" oninput="updateWaterTarget(this.value)">
-        </div>
-      </details>
-
-      <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
-        <summary style="font-weight:bold; cursor:pointer; outline:none;">グラフ設定</summary>
-        <div style="margin-top:10px;">
-          <label for="graph-height-slider">グラフ高さ: <span id="graph-height-value">360</span>px</label>
-          <input type="range" id="graph-height-slider" min="200" max="800" step="10" value="360" oninput="updateGraphSetting('Height', this.value)">
-        </div>
-        <div style="margin-top:10px;">
-          <label for="graph-line-color-input">グラフ線の色:</label>
-          <input type="color" id="graph-line-color-input" value="#007bff" oninput="updateGraphAppearanceSetting('graphLineColor', this.value)">
-        </div>
-        <div style="margin-top:10px;">
-          <label for="graph-line-width-slider">グラフ線の太さ: <span id="graph-line-width-value">3</span>px</label>
-          <input type="range" id="graph-line-width-slider" min="1" max="10" step="1" value="3" oninput="updateGraphAppearanceSetting('graphLineWidth', this.value)">
-        </div>
-        <div style="margin-top:10px; border-top: 1px dashed #ddd; padding-top: 10px;">
-          <label for="graph-ma-line-color-input">移動平均線の色:</label>
-          <input type="color" id="graph-ma-line-color-input" value="#ff9800" oninput="updateGraphAppearanceSetting('graphMaLineColor', this.value)">
-        </div>
-        <div style="margin-top:10px;">
-          <label for="graph-ma-line-width-slider">移動平均線の太さ: <span id="graph-ma-line-width-value">3</span>px</label>
-          <input type="range" id="graph-ma-line-width-slider" min="1" max="10" step="1" value="3" oninput="updateGraphAppearanceSetting('graphMaLineWidth', this.value)">
-        </div>
-        <div style="margin-top:10px; border-top: 1px dashed #ddd; padding-top: 10px;">
-          <label for="graph-latest-line-color-input">最新値線の色:</label>
-          <input type="color" id="graph-latest-line-color-input" value="#ff0000" oninput="updateGraphAppearanceSetting('graphLatestLineColor', this.value)">
-        </div>
-        <div style="margin-top:10px;">
-          <label for="graph-latest-line-width-slider">最新値線の太さ: <span id="graph-latest-line-width-value">1</span>px</label>
-          <input type="range" id="graph-latest-line-width-slider" min="1" max="10" step="1" value="1" oninput="updateGraphAppearanceSetting('graphLatestLineWidth', this.value)">
-        </div>
-        <div style="margin-top:10px;">
-          <label for="graph-font-size-slider">データフォントサイズ (PC): <span id="graph-font-size-value">10</span>px</label>
-          <input type="range" id="graph-font-size-slider" min="8" max="24" step="1" value="10" oninput="updateGraphAppearanceSetting('graphDataFontSize', this.value)">
-          <p style="font-size:11px; color:var(--text-sub); margin-top:5px;">
-            ※スマホ/タブレットでは、この設定値の2倍のサイズで表示されます。
-          </p>
-        </div>
-        <div style="margin-top:10px;">
-          <label for="graph-min-label-spacing-slider">データラベル最小間隔 (文字数分): <span id="graph-min-label-spacing-value">8</span></label>
-          <input type="range" id="graph-min-label-spacing-slider" min="0" max="20" step="0.5" value="8" oninput="updateGraphAppearanceSetting('graphMinLabelSpacing', this.value)">
-          <p style="font-size:11px; color:var(--text-sub); margin-top:5px;">
-            ※値を大きくするとラベルが間引かれ、重なりにくくなります。
-          </p>
-        </div>
-        <div style="margin-top:10px;">
-          <label for="graph-xaxis-interval-select">X軸ラベル表示間隔:</label>
-          <select id="graph-xaxis-interval-select" onchange="updateGraphAppearanceSetting('graphXAxisInterval', this.value)" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:5px;">
-            <option value="auto">自動</option>
-            <option value="1">1ヶ月</option>
-            <option value="2">2ヶ月</option>
-            <option value="3">3ヶ月</option>
-            <option value="6">6ヶ月</option>
-            <option value="12">1年</option>
-          </select>
-        </div>
-        <div style="margin-top:10px;">
-          <label for="graph-axis-font-size-slider">軸ラベルフォントサイズ: <span id="graph-axis-font-size-value">10</span>px</label>
-          <input type="range" id="graph-axis-font-size-slider" min="8" max="20" step="1" value="10" oninput="updateGraphAppearanceSetting('graphAxisFontSize', this.value)">
-        </div>
-        <div style="margin-top:10px;">
-          <label for="graph-title-font-size-slider">グラフタイトルフォントサイズ: <span id="graph-title-font-size-value">14</span>px</label>
-          <input type="range" id="graph-title-font-size-slider" min="10" max="30" step="1" value="14" oninput="updateGraphAppearanceSetting('graphTitleFontSize', this.value)">
-        </div>
-        <div style="margin-top:10px; border-top: 1px dashed #ddd; padding-top: 10px;">
-          <label style="display:flex; align-items:center; font-size:14px;">
-            <input type="checkbox" id="graph-marker-show-switch" onchange="updateGraphAppearanceSetting('graphMarkerShow', this.checked)" style="width:auto; height:18px; width:18px; margin-right:10px;">
-            データマーカーを表示する
-          </label>
-        </div>
-        <div style="margin-top:10px;">
-          <label for="graph-marker-size-slider">マーカーサイズ: <span id="graph-marker-size-value">4</span>px</label>
-          <input type="range" id="graph-marker-size-slider" min="1" max="10" step="1" value="4" oninput="updateGraphAppearanceSetting('graphMarkerSize', this.value)">
         </div>
       </details>
 
@@ -1067,7 +992,6 @@ let st = {
 let analysisRecordsCache = [];
 const RECS_PER_PAGE = 20;
 let backupCounter = 0;
-let graphUpdateTimer = null;
 let navHideTimer = null;
 let navScrollListener = null;
 // ▲▲▲ 追加 ▲▲▲
@@ -1358,56 +1282,6 @@ function toggleDarkMode(isChecked) {
 
 function applyTheme() {
   document.body.classList.toggle('dark-mode', !!(st.settings && st.settings.darkMode));
-}
-
-function updateGraphSetting(key, value) {
-  if (!st.settings) st.settings = {};
-  const numValue = parseInt(value, 10);
-  st.settings['graph' + key] = numValue;
-  document.getElementById(`graph-${key.toLowerCase()}-value`).innerText = numValue;
-  saveSettings();
-}
-
-function updateGraphAppearanceSetting(key, value) {
-  if (!st.settings) st.settings = {};
-  const isBoolean = typeof value === 'boolean';
-  const isNumeric = !isBoolean && !key.includes('Color') && key !== 'graphXAxisInterval';
-  let finalValue = value;
-  if (isNumeric) {
-    if (key === 'graphMinLabelSpacing') finalValue = parseFloat(value);
-    else finalValue = parseInt(value, 10);
-  }
-
-  st.settings[key] = finalValue;
-  
-  if (key === 'graphLineWidth') {
-    document.getElementById('graph-line-width-value').innerText = finalValue;
-  } else if (key === 'graphMaLineWidth') {
-    document.getElementById('graph-ma-line-width-value').innerText = finalValue;
-  } else if (key === 'graphLatestLineWidth') {
-    document.getElementById('graph-latest-line-width-value').innerText = finalValue;
-  } else if (key === 'graphDataFontSize') {
-    document.getElementById('graph-font-size-value').innerText = finalValue;
-  } else if (key === 'graphMinLabelSpacing') {
-    document.getElementById('graph-min-label-spacing-value').innerText = finalValue;
-  } else if (key === 'graphAxisFontSize') {
-    document.getElementById('graph-axis-font-size-value').innerText = finalValue;
-  } else if (key === 'graphTitleFontSize') {
-    document.getElementById('graph-title-font-size-value').innerText = finalValue;
-  } else if (key === 'graphMarkerSize') {
-    document.getElementById('graph-marker-size-value').innerText = finalValue;
-  }
-  
-  saveSettings();
-
-  // デバウンス処理でグラフを更新
-  clearTimeout(graphUpdateTimer);
-  graphUpdateTimer = setTimeout(() => {
-    const resDiv = document.getElementById('ext-result');
-    if (st.view === 'analysis' && resDiv && (resDiv.querySelector('canvas') || resDiv.querySelector('svg'))) {
-      renderExtGraph(true);
-    }
-  }, 300); // 300ms待ってから更新
 }
 
 function updateWaterTarget(value) {
@@ -1727,14 +1601,47 @@ function renderMaintView(c) {
 function renderExportCatList() {
   const list = document.getElementById('exp-cat-list');
   if (!list) return;
-  list.innerHTML = st.cats.map(c => `
-    <label style="display:block; font-size:12px; margin-bottom:2px; cursor:pointer;">
-      <input type="checkbox" class="exp-cat-chk" value="${c.id}" checked style="vertical-align:middle;"> ${esc(c.name)}
+
+  // 保存された選択状態を取得 (なければ全選択)
+  let selectedIds = null;
+  if (st.settings && st.settings.exportSelectedCats) {
+    selectedIds = st.settings.exportSelectedCats;
+  }
+
+  list.innerHTML = st.cats.map(c => {
+    const isChecked = selectedIds ? selectedIds.includes(c.id) : true;
+    return `
+    <label style="display:flex; align-items:center; font-size:12px; padding:1px 0; margin:0; cursor:pointer; white-space:nowrap;">
+      <input type="checkbox" class="exp-cat-chk" value="${c.id}" ${isChecked ? 'checked' : ''} onchange="updateExportCatSetting()" style="margin-right:4px; flex-shrink:0;"> ${esc(c.name)}
     </label>
-  `).join('');
+  `}).join('');
+
+  // 「全て選択」チェックボックスの同期
+  const allChk = document.getElementById('exp-cat-all');
+  if (allChk) {
+      const allChecked = list.querySelectorAll('.exp-cat-chk:not(:checked)').length === 0;
+      allChk.checked = allChecked;
+  }
+}
+function updateExportCatSetting() {
+  const chks = document.querySelectorAll('.exp-cat-chk:checked');
+  const ids = Array.from(chks).map(c => c.value);
+  
+  if (!st.settings) st.settings = {};
+  st.settings.exportSelectedCats = ids;
+  saveSettings();
+
+  // 「全て選択」チェックボックスの同期
+  const allChk = document.getElementById('exp-cat-all');
+  if (allChk) {
+      const list = document.getElementById('exp-cat-list');
+      const allChecked = list && list.querySelectorAll('.exp-cat-chk:not(:checked)').length === 0;
+      allChk.checked = allChecked;
+  }
 }
 function toggleExportAll(checked) {
   document.querySelectorAll('.exp-cat-chk').forEach(c => c.checked = checked);
+  updateExportCatSetting();
 }
 function getSelectedExportCats() {
   const chks = document.querySelectorAll('.exp-cat-chk:checked');
@@ -1756,82 +1663,6 @@ function renderMaintSettings() {
       const freq = (st.settings && st.settings.backupFrequency) || 1;
       backupFreqSlider.value = freq;
       document.getElementById('backup-freq-value').innerText = freq;
-    }
-    const graphHeightSlider = document.getElementById('graph-height-slider');
-    if (graphHeightSlider && st.settings.graphHeight) {
-      graphHeightSlider.value = st.settings.graphHeight;
-      document.getElementById('graph-height-value').innerText = st.settings.graphHeight;
-    }
-
-    const lineColorInput = document.getElementById('graph-line-color-input');
-    if (lineColorInput) lineColorInput.value = st.settings.graphLineColor || '#007bff';
-
-    const lineWidthSlider = document.getElementById('graph-line-width-slider');
-    if (lineWidthSlider) {
-      const width = st.settings.graphLineWidth || 3;
-      lineWidthSlider.value = width;
-      document.getElementById('graph-line-width-value').innerText = width;
-    }
-
-    const maLineColorInput = document.getElementById('graph-ma-line-color-input');
-    if (maLineColorInput) maLineColorInput.value = st.settings.graphMaLineColor || '#ff9800';
-    const maLineWidthSlider = document.getElementById('graph-ma-line-width-slider');
-    if (maLineWidthSlider) {
-      const width = st.settings.graphMaLineWidth || 3;
-      maLineWidthSlider.value = width;
-      document.getElementById('graph-ma-line-width-value').innerText = width;
-    }
-    const latestLineColorInput = document.getElementById('graph-latest-line-color-input');
-    if (latestLineColorInput) latestLineColorInput.value = st.settings.graphLatestLineColor || '#ff0000';
-    const latestLineWidthSlider = document.getElementById('graph-latest-line-width-slider');
-    if (latestLineWidthSlider) {
-      const width = st.settings.graphLatestLineWidth || 1;
-      latestLineWidthSlider.value = width;
-      document.getElementById('graph-latest-line-width-value').innerText = width;
-    }
-
-    const fontSizeSlider = document.getElementById('graph-font-size-slider');
-    if (fontSizeSlider) {
-      const size = st.settings.graphDataFontSize || 10;
-      fontSizeSlider.value = size;
-      document.getElementById('graph-font-size-value').innerText = size;
-    }
-
-    const minLabelSpacingSlider = document.getElementById('graph-min-label-spacing-slider');
-    if (minLabelSpacingSlider) {
-      const spacing = st.settings.graphMinLabelSpacing !== undefined ? st.settings.graphMinLabelSpacing : 8;
-      minLabelSpacingSlider.value = spacing;
-      document.getElementById('graph-min-label-spacing-value').innerText = spacing;
-    }
-
-    const xAxisIntervalSelect = document.getElementById('graph-xaxis-interval-select');
-    if (xAxisIntervalSelect) {
-      xAxisIntervalSelect.value = st.settings.graphXAxisInterval || 'auto';
-    }
-
-    const axisFontSizeSlider = document.getElementById('graph-axis-font-size-slider');
-    if (axisFontSizeSlider) {
-      const size = st.settings.graphAxisFontSize || 10;
-      axisFontSizeSlider.value = size;
-      document.getElementById('graph-axis-font-size-value').innerText = size;
-    }
-
-    const titleFontSizeSlider = document.getElementById('graph-title-font-size-slider');
-    if (titleFontSizeSlider) {
-      const size = st.settings.graphTitleFontSize || 14;
-      titleFontSizeSlider.value = size;
-      document.getElementById('graph-title-font-size-value').innerText = size;
-    }
-
-    const markerShowSwitch = document.getElementById('graph-marker-show-switch');
-    if (markerShowSwitch) {
-      markerShowSwitch.checked = (st.settings.graphMarkerShow !== false);
-    }
-    const markerSizeSlider = document.getElementById('graph-marker-size-slider');
-    if (markerSizeSlider) {
-      const size = st.settings.graphMarkerSize || 4;
-      markerSizeSlider.value = size;
-      document.getElementById('graph-marker-size-value').innerText = size;
     }
 
     const waterTargetNum = document.getElementById('water-target-num');
