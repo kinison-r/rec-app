@@ -1779,7 +1779,7 @@ function rIn(c) {
         h += `</div>`;
         // ▼▼▼ 追加: 薬剤グループ入力ボタン (select用) ▼▼▼
         // 在庫区分フィールドでは重複するため表示しない
-        if (st.settings.drugGroups && st.settings.drugGroups.length > 0 && f.name !== '在庫区分') {
+        if ((c.name.includes('薬') || c.name.includes('サプリ')) && st.settings.drugGroups && st.settings.drugGroups.length > 0 && f.name !== '在庫区分') {
             h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
             h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
             h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
@@ -1805,7 +1805,7 @@ function rIn(c) {
         h += `</div>`;
         // ▼▼▼ 追加: 薬剤グループ入力ボタン (multi_select用) ▼▼▼
         // 在庫区分フィールドでは重複するため表示しない
-        if (st.settings.drugGroups && st.settings.drugGroups.length > 0 && f.name !== '在庫区分') {
+        if ((c.name.includes('薬') || c.name.includes('サプリ')) && st.settings.drugGroups && st.settings.drugGroups.length > 0 && f.name !== '在庫区分') {
             h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
             h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
             h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
@@ -1840,7 +1840,7 @@ function rIn(c) {
             h += `</div></div>`;
         }
         // ▼▼▼ 追加: 薬剤グループ入力ボタン ▼▼▼
-        if (st.settings.drugGroups && st.settings.drugGroups.length > 0) {
+        if ((c.name.includes('薬') || c.name.includes('サプリ')) && st.settings.drugGroups && st.settings.drugGroups.length > 0) {
             h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
             h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
             h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
@@ -1855,7 +1855,7 @@ function rIn(c) {
       case 'simple_text':
         h += `<textarea id="i-${f.id}" rows="1" oninput="autoResize(this)" style="resize:none; min-height:40px;">${esc(val)}</textarea>`;
         // ▼▼▼ 追加: 薬剤グループ入力ボタン (simple_text用) ▼▼▼
-        if (st.settings.drugGroups && st.settings.drugGroups.length > 0) {
+        if ((c.name.includes('薬') || c.name.includes('サプリ')) && st.settings.drugGroups && st.settings.drugGroups.length > 0) {
             h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
             h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
             h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
