@@ -7060,12 +7060,30 @@ function renderDrugGroups() {
         <div style="font-weight:bold; font-size:14px; margin-bottom:5px;">${esc(g.name)}</div>
         <div style="font-size:12px; color:var(--text-sub); word-break:break-all; background:var(--bg-tag); padding:5px; border-radius:4px;">${esc(g.items)}</div>
         <div style="text-align:right; margin-top:5px;">
+           <button class="btn-sub" onclick="moveDrugGroup(${i}, -1)" ${i === 0 ? 'disabled style="opacity:0.3"' : ''}>↑</button>
+           <button class="btn-sub" onclick="moveDrugGroup(${i}, 1)" ${i === groups.length - 1 ? 'disabled style="opacity:0.3"' : ''}>↓</button>
            <button class="btn-sub" onclick="editDrugGroup(${i})">編集</button>
            <button class="btn-sub" style="background:#dc3545;" onclick="delDrugGroup(${i})">削除</button>
         </div>
       </div>
     `).join('');
   }
+}
+
+function moveDrugGroup(idx, dir) {
+  if (!st.settings.drugGroups) return;
+  const groups = st.settings.drugGroups;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= groups.length) return;
+  
+  [groups[idx], groups[newIdx]] = [groups[newIdx], groups[idx]];
+  
+  // 編集中の場合はインデックスも追従させる
+  if (st.editDrugGroupIdx === idx) st.editDrugGroupIdx = newIdx;
+  else if (st.editDrugGroupIdx === newIdx) st.editDrugGroupIdx = idx;
+  
+  saveSettings();
+  renderDrugGroups();
 }
 
 function addDrugGroup() {
