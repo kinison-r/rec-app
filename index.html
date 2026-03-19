@@ -2504,6 +2504,11 @@ function saveRec() {
     const newRec = { ...st.form };
     delete newRec.id;
     delete newRec.original_dt;
+    // ▼▼▼ 変更: コピーモード時に完了フラグをクリア ▼▼▼
+    if (st.saveMode === 'copy') {
+      delete newRec.isCompleted;
+    }
+    // ▲▲▲ 変更 ▲▲▲
     c.records.unshift({ ...newRec, id: 'r' + Date.now(), dt: toJSTISOString(new Date()) });
     
     // ▼▼▼ 追加: 在庫自動減算処理 ▼▼▼
