@@ -1783,8 +1783,12 @@ function rIn(c) {
             h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
             h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
             h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
+            const todayStr = formatDateYMD(new Date());
             st.settings.drugGroups.forEach(g => {
-                h += `<button type="button" class="btn-sub" style="background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe; white-space:nowrap;" onclick="applyDrugGroup('${f.id}', '${esc(g.items)}')">${esc(g.name)}</button>`;
+                const lastUsed = (st.settings.drugGroupHistory || {})[g.name];
+                const isUsedToday = lastUsed === todayStr;
+                const btnStyle = isUsedToday ? "background:#e0e0e0; color:#999; border:1px solid #ccc; cursor:not-allowed;" : "background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe;";
+                h += `<button type="button" class="btn-sub" style="${btnStyle} white-space:nowrap;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
             });
             h += `</div></div>`;
         }
@@ -1809,8 +1813,12 @@ function rIn(c) {
             h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
             h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
             h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
+            const todayStr = formatDateYMD(new Date());
             st.settings.drugGroups.forEach(g => {
-                h += `<button type="button" class="btn-sub" style="background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe; white-space:nowrap;" onclick="applyDrugGroup('${f.id}', '${esc(g.items)}')">${esc(g.name)}</button>`;
+                const lastUsed = (st.settings.drugGroupHistory || {})[g.name];
+                const isUsedToday = lastUsed === todayStr;
+                const btnStyle = isUsedToday ? "background:#e0e0e0; color:#999; border:1px solid #ccc; cursor:not-allowed;" : "background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe;";
+                h += `<button type="button" class="btn-sub" style="${btnStyle} white-space:nowrap;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
             });
             h += `</div></div>`;
         }
@@ -1844,8 +1852,12 @@ function rIn(c) {
             h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
             h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
             h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
+            const todayStr = formatDateYMD(new Date());
             st.settings.drugGroups.forEach(g => {
-                h += `<button type="button" class="btn-sub" style="background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe; white-space:nowrap;" onclick="applyDrugGroup('${f.id}', '${esc(g.items)}')">${esc(g.name)}</button>`;
+                const lastUsed = (st.settings.drugGroupHistory || {})[g.name];
+                const isUsedToday = lastUsed === todayStr;
+                const btnStyle = isUsedToday ? "background:#e0e0e0; color:#999; border:1px solid #ccc; cursor:not-allowed;" : "background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe;";
+                h += `<button type="button" class="btn-sub" style="${btnStyle} white-space:nowrap;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
             });
             h += `</div></div>`;
         }
@@ -1859,8 +1871,12 @@ function rIn(c) {
             h += `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
             h += `<label style="font-size:10px; color:var(--text-sub);">グループ一括入力:</label>`;
             h += `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
+            const todayStr = formatDateYMD(new Date());
             st.settings.drugGroups.forEach(g => {
-                h += `<button type="button" class="btn-sub" style="background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe; white-space:nowrap;" onclick="applyDrugGroup('${f.id}', '${esc(g.items)}')">${esc(g.name)}</button>`;
+                const lastUsed = (st.settings.drugGroupHistory || {})[g.name];
+                const isUsedToday = lastUsed === todayStr;
+                const btnStyle = isUsedToday ? "background:#e0e0e0; color:#999; border:1px solid #ccc; cursor:not-allowed;" : "background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe;";
+                h += `<button type="button" class="btn-sub" style="${btnStyle} white-space:nowrap;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
             });
             h += `</div></div>`;
         }
@@ -7155,7 +7171,7 @@ function delDrugGroup(idx) {
   renderDrugGroups();
 }
 
-function applyDrugGroup(fid, itemsStr) {
+function applyDrugGroup(fid, itemsStr, groupName) {
   const c = st.cats.find(x => x.id === st.cur);
   if (!c) return;
 
@@ -7167,7 +7183,7 @@ function applyDrugGroup(fid, itemsStr) {
 
   // 必須フィールドが揃っている場合は、自動記録作成モードとして動作
   if (fDrug && fType && fAmount && fStock) {
-    applyDrugGroupAndCreateRecords(itemsStr);
+    applyDrugGroupAndCreateRecords(itemsStr, groupName);
     return;
   }
 
@@ -7210,6 +7226,16 @@ function applyDrugGroup(fid, itemsStr) {
       }
   }
   showToast(`グループを展開しました: ${itemsToAdd.length}件`);
+
+  // 履歴保存とボタン状態更新
+  if (groupName) {
+    if (!st.settings.drugGroupHistory) st.settings.drugGroupHistory = {};
+    st.settings.drugGroupHistory[groupName] = formatDateYMD(new Date());
+    saveSettings();
+    // 画面再描画（ボタンをグレーアウトさせるため）
+    captureFormValues();
+    rIn(c);
+  }
 }
 
 function estimateUnitAmountFromRemarks(remarks) {
@@ -7230,7 +7256,7 @@ function estimateUnitAmountFromRemarks(remarks) {
     return 1;
 }
 
-async function applyDrugGroupAndCreateRecords(itemsStr) {
+async function applyDrugGroupAndCreateRecords(itemsStr, groupName) {
   const c = st.cats.find(x => x.id === st.cur);
   if (!c) { alert('カテゴリーが選択されていません。'); return; }
 
@@ -7275,6 +7301,13 @@ async function applyDrugGroupAndCreateRecords(itemsStr) {
 
     c.records.unshift(newRec);
     createdCount++;
+  }
+
+  // 履歴保存
+  if (groupName) {
+    if (!st.settings.drugGroupHistory) st.settings.drugGroupHistory = {};
+    st.settings.drugGroupHistory[groupName] = formatDateYMD(new Date());
+    saveSettings();
   }
 
   c.records.sort((a, b) => getDt(b) - getDt(a));
