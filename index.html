@@ -1788,7 +1788,7 @@ function rIn(c) {
                 const lastUsed = (st.settings.drugGroupHistory || {})[g.name];
                 const isUsedToday = lastUsed === todayStr;
                 const btnStyle = isUsedToday ? "background:#e0e0e0; color:#999; border:1px solid #ccc; cursor:not-allowed;" : "background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe;";
-                h += `<button type="button" class="btn-sub" style="${btnStyle} white-space:nowrap;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
+                h += `<button type="button" class="btn-sub" style="${btnStyle} padding:10px; flex:1; min-width:80px;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
             });
             h += `</div></div>`;
         }
@@ -1818,7 +1818,7 @@ function rIn(c) {
                 const lastUsed = (st.settings.drugGroupHistory || {})[g.name];
                 const isUsedToday = lastUsed === todayStr;
                 const btnStyle = isUsedToday ? "background:#e0e0e0; color:#999; border:1px solid #ccc; cursor:not-allowed;" : "background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe;";
-                h += `<button type="button" class="btn-sub" style="${btnStyle} white-space:nowrap;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
+                h += `<button type="button" class="btn-sub" style="${btnStyle} padding:10px; flex:1; min-width:80px;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
             });
             h += `</div></div>`;
         }
@@ -1857,7 +1857,7 @@ function rIn(c) {
                 const lastUsed = (st.settings.drugGroupHistory || {})[g.name];
                 const isUsedToday = lastUsed === todayStr;
                 const btnStyle = isUsedToday ? "background:#e0e0e0; color:#999; border:1px solid #ccc; cursor:not-allowed;" : "background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe;";
-                h += `<button type="button" class="btn-sub" style="${btnStyle} white-space:nowrap;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
+                h += `<button type="button" class="btn-sub" style="${btnStyle} padding:10px; flex:1; min-width:80px;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
             });
             h += `</div></div>`;
         }
@@ -1876,7 +1876,7 @@ function rIn(c) {
                 const lastUsed = (st.settings.drugGroupHistory || {})[g.name];
                 const isUsedToday = lastUsed === todayStr;
                 const btnStyle = isUsedToday ? "background:#e0e0e0; color:#999; border:1px solid #ccc; cursor:not-allowed;" : "background:#e7f1ff; color:#0056b3; border:1px solid #b6d4fe;";
-                h += `<button type="button" class="btn-sub" style="${btnStyle} white-space:nowrap;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
+                h += `<button type="button" class="btn-sub" style="${btnStyle} padding:10px; flex:1; min-width:80px;" ${isUsedToday ? 'disabled' : ''} onclick="applyDrugGroup('${f.id}', '${esc(g.items)}', '${esc(g.name)}')">${esc(g.name)}</button>`;
             });
             h += `</div></div>`;
         }
