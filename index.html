@@ -7268,7 +7268,19 @@ async function applyDrugGroupAndCreateRecords(itemsStr, groupName) {
   const items = itemsStr.split(/[\s　,]+/).filter(x => x);
   if (items.length === 0) return;
 
-  if (!confirm(`${items.length}件の使用記録を自動作成しますか？`)) return;
+  let msg = `${items.length}件の使用記録を自動作成しますか？\n\n`;
+  items.forEach(drug => {
+    let lastDate = '履歴なし';
+    const lastRec = c.records.find(r => {
+      const rd = r[fDrug.id];
+      const rt = r[fType.id];
+      return rd && String(rd).includes(drug) && rt === '使用';
+    });
+    if (lastRec) lastDate = formatDateYMDHM(getDt(lastRec));
+    msg += `・${drug} (最終: ${lastDate})\n`;
+  });
+
+  if (!confirm(msg)) return;
 
   document.body.style.cursor = 'wait';
 
