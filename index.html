@@ -5111,7 +5111,11 @@ function renderMedicalExpenses() {
   const agg = {}; // { year: { key: { hospital, person, type, amount, comp, count } } }
 
   cat.records.forEach(r => {
-    const dt = getDt(r);
+    let dt = getDt(r);
+    if (fDate && r[fDate.id]) {
+      const d = new Date(r[fDate.id]);
+      if (!isNaN(d.getTime())) dt = d;
+    }
     const year = dt.getFullYear();
     
     const hospital = r[fHospital.id] || '(不明)';
@@ -5188,7 +5192,14 @@ async function expMedicalExpensesExcel() {
     ["No", "医療を受けた人", "病院・薬局などの名称", "診療・治療", "医薬品購入", "介護保険サービス", "その他の医療費", "支払った医療費の金額", "左のうち、補填される金額", "支払年月日"]
   ];
 
-  const records = [...cat.records].sort((a, b) => getDt(a) - getDt(b));
+  const getRecDate = (r) => {
+      if (fDate && r[fDate.id]) {
+          const d = new Date(r[fDate.id]);
+          if (!isNaN(d.getTime())) return d;
+      }
+      return getDt(r);
+  };
+  const records = [...cat.records].sort((a, b) => getRecDate(a) - getRecDate(b));
 
   records.forEach((r, i) => {
     const no = i + 1;
@@ -5212,7 +5223,7 @@ async function expMedicalExpensesExcel() {
     const amount = parseMoney(r[fAmount.id]);
     const comp = parseMoney(r[fComp.id]);
     
-    const dt = getDt(r);
+    const dt = getRecDate(r);
     const dateStr = `${dt.getFullYear()}/${dt.getMonth() + 1}/${dt.getDate()}`;
 
     data.push([no, person, hospital, isTreatment, isMedicine, isNursing, isOther, amount, comp, dateStr]);
@@ -7268,19 +7279,7 @@ async function applyDrugGroupAndCreateRecords(itemsStr, groupName) {
   const items = itemsStr.split(/[\s　,]+/).filter(x => x);
   if (items.length === 0) return;
 
-  let msg = `${items.length}件の使用記録を自動作成しますか？\n\n`;
-  items.forEach(drug => {
-    let lastDate = '履歴なし';
-    const lastRec = c.records.find(r => {
-      const rd = r[fDrug.id];
-      const rt = r[fType.id];
-      return rd && String(rd).includes(drug) && rt === '使用';
-    });
-    if (lastRec) lastDate = formatDateYMDHM(getDt(lastRec));
-    msg += `・${drug} (最終: ${lastDate})\n`;
-  });
-
-  if (!confirm(msg)) return;
+  if (!confirm(`${items.length}件の使用記録を自動作成しますか？`)) return;
 
   document.body.style.cursor = 'wait';
 
