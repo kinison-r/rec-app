@@ -5079,7 +5079,7 @@ function toggleMedicalExpenses() {
   }
 }
 
-function renderMedicalExpenses() {
+function renderMedicalExpenses(targetYear = null) {
   // カテゴリ特定
   const cat = st.cats.find(c => c.name === '医療費控除' || c.id === 'c1770536843376');
   if (!cat) {
@@ -5107,8 +5107,15 @@ function renderMedicalExpenses() {
      return;
   }
 
+  const now = new Date();
+  if (!targetYear) {
+    targetYear = now.getFullYear();
+    if (now.getMonth() < 3) targetYear--; // 1-3月は前年度
+  }
+
   // 集計処理
-  const agg = {}; // { year: { key: { hospital, person, type, amount, comp, count } } }
+  const agg = {};
+  const allYears = new Set();
 
   cat.records.forEach(r => {
     let dt = getDt(r);
@@ -5117,6 +5124,9 @@ function renderMedicalExpenses() {
       if (!isNaN(d.getTime())) dt = d;
     }
     const year = dt.getFullYear();
+    allYears.add(year);
+
+    if (year !== targetYear) return;
     
     const hospital = r[fHospital.id] || '(不明)';
     const person = r[fPerson.id] || '(不明)';
@@ -5144,34 +5154,42 @@ function renderMedicalExpenses() {
 
   // HTML生成
   let html = '';
-  const years = Object.keys(agg).sort((a,b) => b - a);
 
-  if (years.length === 0) {
-    html = '<div style="padding:20px; text-align:center;">集計対象のデータがありません。</div>';
+  const sortedYears = Array.from(allYears);
+  if (!allYears.has(targetYear)) sortedYears.push(targetYear);
+  sortedYears.sort((a,b) => b - a);
+
+  html += `<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #eee;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <label style="font-size:14px; font-weight:bold; margin:0;">表示年度:</label>
+      <select onchange="renderMedicalExpenses(parseInt(this.value))" style="width:auto; padding:5px 10px; margin:0; font-size:14px;">
+        ${sortedYears.map(y => `<option value="${y}" ${y === targetYear ? 'selected' : ''}>${y}年</option>`).join('')}
+      </select>
+    </div>
+    <button class="btn-sub" style="background:#28a745; color:white; font-weight:bold; padding:6px 12px;" onclick="expMedicalExpensesExcel(${targetYear})">医療費集計フォーマット(Excel)出力</button>
+  </div>`;
+
+  if (!agg[targetYear]) {
+    html += `<div style="padding:20px; text-align:center;">${targetYear}年分のデータはありません。</div>`;
   } else {
-    html += `<div style="text-align:right; margin-bottom:10px;">
-      <button class="btn-sub" style="background:#28a745; color:white; font-weight:bold; padding:6px 12px;" onclick="expMedicalExpensesExcel()">医療費集計フォーマット(Excel)出力</button>
-    </div>`;
-    years.forEach(year => {
-      html += `<h3 style="margin-top:20px; border-bottom:2px solid #007bff; padding-bottom:5px;">${year}年分</h3>`;
-      html += `<table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:10px;"><thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ddd; padding:5px; text-align:left;">対象者</th><th style="border:1px solid #ddd; padding:5px; text-align:left;">病院・薬局等</th><th style="border:1px solid #ddd; padding:5px; text-align:left;">区分</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">支払額</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">補填額</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">控除対象</th></tr></thead><tbody>`;
-      
-      let yearTotalPay = 0, yearTotalComp = 0;
-      const rows = Object.values(agg[year]).sort((a,b) => { if (a.person !== b.person) return a.person.localeCompare(b.person); return a.hospital.localeCompare(b.hospital); });
+    const year = targetYear;
+    html += `<table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:10px;"><thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ddd; padding:5px; text-align:left;">対象者</th><th style="border:1px solid #ddd; padding:5px; text-align:left;">病院・薬局等</th><th style="border:1px solid #ddd; padding:5px; text-align:left;">区分</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">支払額</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">補填額</th><th style="border:1px solid #ddd; padding:5px; text-align:right;">控除対象</th></tr></thead><tbody>`;
+    
+    let yearTotalPay = 0, yearTotalComp = 0;
+    const rows = Object.values(agg[year]).sort((a,b) => { if (a.person !== b.person) return a.person.localeCompare(b.person); return a.hospital.localeCompare(b.hospital); });
 
-      rows.forEach(row => {
-        const net = row.amount - row.comp;
-        yearTotalPay += row.amount; yearTotalComp += row.comp;
-        html += `<tr><td style="border:1px solid #ddd; padding:5px;">${esc(row.person)}</td><td style="border:1px solid #ddd; padding:5px;">${esc(row.hospital)}</td><td style="border:1px solid #ddd; padding:5px;">${esc(row.type)}</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${row.amount.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${row.comp.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right; font-weight:bold;">${net.toLocaleString()}</td></tr>`;
-      });
-      const yearNet = yearTotalPay - yearTotalComp;
-      html += `<tr style="background:#e7f1ff; font-weight:bold;"><td colspan="3" style="border:1px solid #ddd; padding:5px; text-align:center;">合計</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${yearTotalPay.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${yearTotalComp.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right; color:#0056b3;">${yearNet.toLocaleString()}</td></tr></tbody></table>`;
+    rows.forEach(row => {
+      const net = row.amount - row.comp;
+      yearTotalPay += row.amount; yearTotalComp += row.comp;
+      html += `<tr><td style="border:1px solid #ddd; padding:5px;">${esc(row.person)}</td><td style="border:1px solid #ddd; padding:5px;">${esc(row.hospital)}</td><td style="border:1px solid #ddd; padding:5px;">${esc(row.type)}</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${row.amount.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${row.comp.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right; font-weight:bold;">${net.toLocaleString()}</td></tr>`;
     });
+    const yearNet = yearTotalPay - yearTotalComp;
+    html += `<tr style="background:#e7f1ff; font-weight:bold;"><td colspan="3" style="border:1px solid #ddd; padding:5px; text-align:center;">合計</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${yearTotalPay.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right;">${yearTotalComp.toLocaleString()}</td><td style="border:1px solid #ddd; padding:5px; text-align:right; color:#0056b3;">${yearNet.toLocaleString()}</td></tr></tbody></table>`;
   }
   document.getElementById('medical-expenses-body').innerHTML = html;
 }
 
-async function expMedicalExpensesExcel() {
+async function expMedicalExpensesExcel(targetYear = null) {
   if (typeof XLSX === 'undefined') { alert('Excel出力ライブラリ(SheetJS)が読み込まれていません。インターネット接続を確認してください。'); return; }
 
   const cat = st.cats.find(c => c.name === '医療費控除' || c.id === 'c1770536843376');
@@ -5199,7 +5217,9 @@ async function expMedicalExpensesExcel() {
       }
       return getDt(r);
   };
-  const records = [...cat.records].sort((a, b) => getRecDate(a) - getRecDate(b));
+  const records = [...cat.records]
+    .filter(r => !targetYear || getRecDate(r).getFullYear() === targetYear)
+    .sort((a, b) => getRecDate(a) - getRecDate(b));
 
   records.forEach((r, i) => {
     const no = i + 1;
@@ -5237,7 +5257,7 @@ async function expMedicalExpensesExcel() {
   const blob = new Blob([wbout], { type: 'application/octet-stream' });
   
   const ts = getTS();
-  const name = `${VERSION}_${ts}_medical_expenses.xlsx`;
+  const name = `${VERSION}_${ts}_medical_expenses${targetYear ? '_' + targetYear : ''}.xlsx`;
   if(await saveBlob(blob, name)) { addIoLog('export', name, true); showToast('保存しました: ' + name); }
 }
 // ▲▲▲ 追加 ▲▲▲
@@ -7279,7 +7299,16 @@ async function applyDrugGroupAndCreateRecords(itemsStr, groupName) {
   const items = itemsStr.split(/[\s　,]+/).filter(x => x);
   if (items.length === 0) return;
 
-  if (!confirm(`${items.length}件の使用記録を自動作成しますか？`)) return;
+  // 薬剤ごとの前回更新日を取得して確認メッセージを作成
+  const stockData = getStockData();
+  let confirmMsg = `グループ「${groupName}」の記録（${items.length}件）を自動作成しますか？\n\n`;
+  items.forEach(name => {
+    const info = stockData.find(s => s.name === name);
+    const dateStr = (info && info.dt && info.dt.getTime() !== 0) ? formatDateYMDHM(info.dt) : "記録なし";
+    confirmMsg += `・${name} (前回: ${dateStr})\n`;
+  });
+
+  if (!confirm(confirmMsg)) return;
 
   document.body.style.cursor = 'wait';
 
