@@ -2584,20 +2584,19 @@ function cancelEdit() {
 function setNextReceiptNumber(fid) {
   const c = st.cats.find(x => x.id === st.cur);
   if (!c) return;
-  let lastVal = 0;
-  // c.recordsは降順（新しい順）なので、最初に見つかった数値を最新とする
+  let maxVal = 0;
+  // 過去の全記録を走査して領収書番号の最大値を探す
   for (const r of c.records) {
     if (st.editR && r.id === st.editR) continue; // 編集中の自分自身は除外
     const val = r[fid];
     if (val) {
       const n = parseInt(String(val).replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/,/g, ''));
       if (!isNaN(n)) {
-        lastVal = n;
-        break;
+        if (n > maxVal) maxVal = n;
       }
     }
   }
-  const newVal = lastVal + 1;
+  const newVal = maxVal + 1;
   const el = document.getElementById('i-' + fid);
   if (el) {
     el.value = newVal;
