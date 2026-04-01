@@ -5934,7 +5934,7 @@ async function resetApp() {
           const rDrug = r[fDrug.id] || '';
           if (rDrug.includes(drugName)) {
             const rStockVal = r[fStock.id];
-            if (rStockVal) {
+            if (rStockVal !== undefined && rStockVal !== null && rStockVal !== '') {
               if (/^-?\d+(\.\d+)?$/.test(rStockVal)) {
                 prevStock = parseFloat(rStockVal);
               } else {
