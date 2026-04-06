@@ -747,7 +747,7 @@
       <details style="margin-top:10px; border:1px solid #ddd; border-radius:8px; padding:10px;">
         <summary style="font-weight:bold; cursor:pointer;">項目設定</summary>
         <div class="mt-2">
-          <select id="sel-f" class="main-sel" onchange="st.cur=this.value; st.editF=null; st.editRef=null; r();"></select>
+          <select id="sel-f" class="main-sel" onchange="st.cur=this.value; st.editF=null; st.editRef=null; st.moveF_sourceId=null; r();"></select>
           <h3 id="title-f" style="font-size:14px; margin-bottom:5px;">項目追加</h3>
           <input id="f-n" placeholder="項目名">
           <select id="f-t" onchange="updateFieldUI()"><option value="text">テキスト(履歴選択)</option><option value="simple_text">テキスト(単純)</option><option value="number">数値</option><option value="select">選択肢</option><option value="multi_select">複数選択肢</option><option value="date">日付</option><option value="time">時刻</option><option value="camera">カメラ</option><option value="file">ファイル取り込み</option></select>
@@ -976,7 +976,9 @@ let st = {
   analysisSelection: new Set(),
   pagination: { input: {}, analysis: 1 },
   debugLogs: [],
-  editDrugGroupIdx: null
+  editDrugGroupIdx: null,
+  moveF_sourceId: null,
+  moveOpt_sourceIdx: null
 };
 let analysisRecordsCache = [];
 const RECS_PER_PAGE = 20;
@@ -2754,39 +2756,79 @@ function getListItems(containerId) {
 
 // ★ テキスト項目オプション編集用ヘルパー（通知時間付き） ★
 function renderTextOptionEditor(containerId, options, showDuration) {
-  const c = document.getElementById(containerId); c.innerHTML = '';
-  options.forEach(opt => {
-    const div = document.createElement('div'); div.className = 'list-edit-row';
+  const c = document.getElementById(containerId);
+  c.innerHTML = '';
+  c.dataset.showDuration = !!showDuration;
+  const isMoving = st.moveOpt_sourceIdx !== null;
+
+  options.forEach((opt, idx) => {
+    const isSource = st.moveOpt_sourceIdx === idx;
+    const div = document.createElement('div');
+    div.className = 'list-edit-row';
     div.style.flexDirection = 'column';
+    if (isSource) div.style.cssText = "flex-direction: column; border: 2px solid #6f42c1; background: var(--bg-tag); border-radius: 8px; padding: 5px;";
+
+    let moveBtnHtml = '';
+    if (!isMoving) {
+      moveBtnHtml = `<button class="btn-sub" style="background:#6f42c1" onclick="moveOptInEditor(this, ${idx})">移動</button>`;
+    } else {
+      if (isSource) {
+        moveBtnHtml = `<button class="btn-sub" style="background:#6c757d" onclick="moveOptInEditor(this, ${idx})">取消</button>`;
+      } else {
+        moveBtnHtml = `<button class="btn-sub" style="background:#28a745" onclick="moveOptInEditor(this, ${idx})">ここに移動</button>`;
+      }
+    }
+
     let h = `<input type="text" class="opt-text" value="${esc(opt.text)}" placeholder="項目名" style="width:100%; margin-bottom:5px;">`;
     h += `<div style="display:flex; gap:5px; justify-content:flex-end; align-items:center;">`;
     if (showDuration) {
       h += `<input type="number" class="opt-dur" value="${opt.duration||''}" placeholder="分" style="width:60px;" title="通知までの時間(分)">`;
     }
     h += `
-      <button style="background:#6c757d" onclick="moveListItem(this,-1)">↑</button>
-      <button style="background:#6c757d" onclick="moveListItem(this,1)">↓</button>
+      ${moveBtnHtml}
       <button style="background:#dc3545" onclick="this.closest('.list-edit-row').remove()">削除</button></div>`;
     div.innerHTML = h;
     c.appendChild(div);
   });
 }
+
+function moveOptInEditor(btn, idx) {
+  const container = btn.closest('.list-edit-row').parentElement;
+  const containerId = container.id;
+  const showDuration = container.dataset.showDuration === 'true';
+  const currentOptions = getTextOptionItems(containerId);
+
+  if (st.moveOpt_sourceIdx === null) {
+    st.moveOpt_sourceIdx = idx;
+  } else {
+    const sIdx = st.moveOpt_sourceIdx;
+    const dIdx = idx;
+    if (sIdx !== dIdx) {
+      const item = currentOptions[sIdx];
+      const destItem = currentOptions[dIdx];
+      currentOptions.splice(sIdx, 1);
+      const newDIdx = currentOptions.indexOf(destItem);
+      currentOptions.splice(newDIdx, 0, item);
+    }
+    st.moveOpt_sourceIdx = null;
+  }
+  renderTextOptionEditor(containerId, currentOptions, showDuration);
+}
+
 function addTextOptionItem(containerId, textId, durId) {
   const tIn = document.getElementById(textId); 
   const dIn = durId ? document.getElementById(durId) : null;
   const val = tIn.value.trim(); if(!val) return;
-  const dur = dIn ? dIn.value.trim() : '';
-  const c = document.getElementById(containerId);
-  const div = document.createElement('div'); div.className = 'list-edit-row';
-  div.style.flexDirection = 'column';
-  let h = `<input type="text" class="opt-text" value="${esc(val)}" style="width:100%; margin-bottom:5px;">`;
-  h += `<div style="display:flex; gap:5px; justify-content:flex-end; align-items:center;">`;
-  if (dIn) {
-    h += `<input type="number" class="opt-dur" value="${esc(dur)}" placeholder="分" style="width:60px;">`;
-  }
-  h += `<button style="background:#6c757d" onclick="moveListItem(this,-1)">↑</button><button style="background:#6c757d" onclick="moveListItem(this,1)">↓</button><button style="background:#dc3545" onclick="this.closest('.list-edit-row').remove()">削除</button></div>`;
-  div.innerHTML = h;
-  c.appendChild(div);
+  
+  const currentOptions = getTextOptionItems(containerId);
+  currentOptions.push({
+    text: val,
+    duration: dIn ? (parseInt(dIn.value) || null) : null
+  });
+  
+  const showDuration = document.getElementById(containerId).dataset.showDuration === 'true';
+  renderTextOptionEditor(containerId, currentOptions, showDuration);
+  
   tIn.value = ''; if(dIn) dIn.value = ''; tIn.focus();
 }
 function getTextOptionItems(containerId) {
@@ -2802,18 +2844,33 @@ function getTextOptionItems(containerId) {
 function rField(c) {
   const list = document.getElementById('list-f');
   const validFields = (c.fields || []).filter(f => f && f.name);
-  list.innerHTML = validFields.map((f, i) => `
-    <div class="card">
+  const isMoving = st.moveF_sourceId !== null;
+
+  list.innerHTML = validFields.map((f, i) => {
+    const isSource = st.moveF_sourceId === f.id;
+    let moveBtnHtml = '';
+    if (!isMoving) {
+      moveBtnHtml = `<button class="btn-sub" style="background:#6f42c1" onclick="moveF('${f.id}')">移動</button>`;
+    } else {
+      if (isSource) {
+        moveBtnHtml = `<button class="btn-sub" style="background:#6c757d" onclick="moveF('${f.id}')">取消</button>`;
+      } else {
+        moveBtnHtml = `<button class="btn-sub" style="background:#28a745" onclick="moveF('${f.id}')">ここに移動</button>`;
+      }
+    }
+    const cardStyle = isSource ? 'border: 2px solid #6f42c1; background: var(--bg-tag);' : '';
+
+    return `
+    <div class="card" style="${cardStyle}">
       <div style="margin-bottom:8px; word-break:break-all;">
         <b>${esc(f.name)}</b> <span style="font-size:0.9em; color:#666;">(${f.type})</span>
       </div>
       <div style="text-align:right;">
-        <button class="btn-sub" onclick="moveF('${f.id}',-1)" ${i === 0 ? 'disabled style="opacity:0.3"' : ''}>↑</button>
-        <button class="btn-sub" onclick="moveF('${f.id}',1)" ${i === validFields.length - 1 ? 'disabled style="opacity:0.3"' : ''}>↓</button>
+        ${moveBtnHtml}
         <button class="btn-sub" onclick="editF('${f.id}')">編集</button>
         <button class="btn-sub" style="background:#ff4d4d" onclick="delF('${f.id}')">削除</button>
       </div>
-    </div>`).join('');
+    </div>`}).join('');
 
   if (st.editF) {
     const f = validFields.find(x => x.id === st.editF);
@@ -2868,6 +2925,7 @@ function updateFieldUI() {
 }
 function editF(id) {
   st.editF = id;
+  st.moveOpt_sourceIdx = null;
   r();
 }
 function saveF() {
@@ -2904,13 +2962,41 @@ function saveF() {
   save();
   r();
 }
-function moveF(id, d) {
+function moveF(id) {
   const c = st.cats.find(x => x.id === st.cur);
-  const i = c.fields.findIndex(x => x.id === id);
-  if (i < 0 || i + d < 0 || i + d >= c.fields.length) return;
-  [c.fields[i], c.fields[i + d]] = [c.fields[i + d], c.fields[i]];
-  save();
-  r();
+  if (!c) return;
+
+  if (st.moveF_sourceId === null) {
+    // 移動元を選択
+    st.moveF_sourceId = id;
+    r();
+    return;
+  }
+
+  const sourceId = st.moveF_sourceId;
+  const destId = id;
+
+  // 同じ項目を選択した場合は解除
+  if (sourceId === destId) {
+    st.moveF_sourceId = null;
+    r();
+    return;
+  }
+
+  const sIdx = c.fields.findIndex(f => f.id === sourceId);
+  const dIdx = c.fields.findIndex(f => f.id === destId);
+
+  if (sIdx !== -1 && dIdx !== -1) {
+    // 移動元の削除
+    const [item] = c.fields.splice(sIdx, 1);
+    // 削除後のリストで移動先のインデックスを再取得し、その直前に挿入
+    const newDIdx = c.fields.findIndex(f => f.id === destId);
+    c.fields.splice(newDIdx, 0, item);
+    
+    st.moveF_sourceId = null;
+    save();
+    r();
+  }
 }
 function delF(id) {
   if (confirm('項目を削除しますか？')) {
