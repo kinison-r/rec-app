@@ -4339,8 +4339,8 @@ function renderAnalysisList() {
     const completedStyle = rec.isCompleted ? `background-color: var(--bg-completed);` : '';
     const toggleBtnText = rec.isCompleted ? '↩️' : '✔️';
     const toggleBtnTitle = rec.isCompleted ? '未完了に戻す' : '完了にする';
-    const toggleBtnHtml = `<button class="btn-sub" title="${toggleBtnTitle}" style="align-self: center; padding: 6px 12px; margin: 0 5px;" onclick="event.stopPropagation(); toggleCompletion('${rec._cid}', '${rec.id}')">${toggleBtnText}</button>`;
-    const deleteBtnHtml = `<button class="del-btn" onclick="event.stopPropagation(); delRec('${rec._cid}', '${rec.id}')">削除</button>`;
+    const toggleBtnHtml = `<button class="btn-sub" title="${toggleBtnTitle}" style="padding: 6px 12px; margin: 0;" onclick="event.stopPropagation(); toggleCompletion('${rec._cid}', '${rec.id}')">${toggleBtnText}</button>`;
+    const deleteBtnHtml = `<button class="del-btn" style="padding: 6px 12px; margin: 0; align-self: auto;" onclick="event.stopPropagation(); delRec('${rec._cid}', '${rec.id}')">削除</button>`;
 
     let dateHtml = formatDateYMDHM(getDt(rec));
     if (rec._isScheduled) {
@@ -4360,7 +4360,7 @@ function renderAnalysisList() {
        dateHtml = `<span style="color:#0056b3; font-weight:bold;">${formatDateYMD(rec._sortDate)}${dow}${daysStr} <span style="font-size:10px; font-weight:normal; color:#555;">(${rec._sortLabel})</span></span> <span style="font-size:10px; color:#999;">(登録: ${formatDateYMDHM(getDt(rec))})</span>`;
     }
     return `
-    <div class="rec-row" style="${completedStyle}">
+    <div class="rec-row" style="flex-direction: column; ${completedStyle}">
       <button class="rec-body" onclick="editRec('${rec._cid}','${rec.id}')">
         <small><span class="cat-tag" style="background:${rec._cc}20; color:${rec._cc}; border:1px solid ${rec._cc}40;">${rec._icon} ${highlight(rec._cn, sRaw)}</span> ${dateHtml}</small>
         <div style="margin-top: 4px;">
@@ -4378,8 +4378,10 @@ function renderAnalysisList() {
           }).filter(x => x).join('')}
         </div>
       </button>
-      ${toggleBtnHtml}
-      ${deleteBtnHtml}
+      <div style="display: flex; justify-content: flex-end; gap: 8px; padding: 0 10px 10px 10px;">
+        ${toggleBtnHtml}
+        ${deleteBtnHtml}
+      </div>
     </div>`;
   }).join('');
   
