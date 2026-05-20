@@ -1197,7 +1197,7 @@ function formatDateYMDHM(d) {
   if (!d) return '';
   const date = new Date(d);
   if (isNaN(date.getTime())) return '';
-  return `${formatDateYMD(date)} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}:${String(date.getSeconds()).padStart(2,'0')}`;
+  return `${formatDateYMD(date)}${getDowStr(date)} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}:${String(date.getSeconds()).padStart(2,'0')}`;
 }
 // ▼▼▼ 追加: 曜日表示ヘルパー ▼▼▼
 function getDowStr(dateVal) {
@@ -1976,6 +1976,9 @@ function rIn(c) {
               const fname = rec[f.id + '_name'];
               const content = (rec[f.id].startsWith('data:image') ? `<img src="${rec[f.id]}" style="height:24px; vertical-align:middle; border-radius:3px;">` : '📄') + (fname ? ' ' + esc(fname) : '');
               return `<span class="field-tag"><b>${esc(f.name)}:</b> ${content}</span>`;
+            }
+            if (f.type === 'date') {
+              return `<span class="field-tag"><b>${esc(f.name)}:</b> ${esc(rec[f.id])}${getDowStr(rec[f.id])}</span>`;
             }
             return `<span class="field-tag"><b>${esc(f.name)}:</b> ${esc(rec[f.id])}</span>`;
           }).filter(x => x).join('')}
@@ -4373,6 +4376,9 @@ function renderAnalysisList() {
               const fname = rec[f.id + '_name'];
               const content = (rec[f.id].startsWith('data:image') ? `<img src="${rec[f.id]}" style="height:24px; vertical-align:middle; border-radius:3px;">` : '📄') + (fname ? ' ' + highlight(fname, sRaw) : '');
               return `<span class="field-tag"><b>${highlight(f.name, sRaw)}:</b> ${content}</span>`;
+            }
+            if (f.type === 'date') {
+              return `<span class="field-tag"><b>${highlight(f.name, sRaw)}:</b> ${highlight(rec[f.id], sRaw)}${getDowStr(rec[f.id])}</span>`;
             }
             return `<span class="field-tag"><b>${highlight(f.name, sRaw)}:</b> ${highlight(rec[f.id], sRaw)}</span>`;
           }).filter(x => x).join('')}
