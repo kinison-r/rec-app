@@ -5218,6 +5218,7 @@ function renderMedicalExpenses(targetYear = null) {
   const fType = cat.fields.find(f => f.name.includes('区分') || f.name.includes('種別'));
   const fAmount = cat.fields.find(f => (f.name.includes('支払') || f.name.includes('金額') || f.name.includes('費用')) && !f.name.includes('補填'));
   const fComp = cat.fields.find(f => f.name.includes('補填') || f.name.includes('保険金'));
+  const fTarget = cat.fields.find(f => f.name.includes('控除対象'));
 
   if (!fDate || !fHospital || !fPerson || !fType || !fAmount || !fComp) {
      const missing = [];
@@ -5251,6 +5252,7 @@ function renderMedicalExpenses(targetYear = null) {
     allYears.add(year);
 
     if (year !== targetYear) return;
+    if (fTarget && r[fTarget.id] === '非対象') return;
     
     const hospital = r[fHospital.id] || '(不明)';
     const person = r[fPerson.id] || '(不明)';
@@ -5327,6 +5329,8 @@ async function expMedicalExpensesExcel(targetYear = null) {
   const fType = cat.fields.find(f => f.name.includes('区分') || f.name.includes('種別'));
   const fAmount = cat.fields.find(f => (f.name.includes('支払') || f.name.includes('金額') || f.name.includes('費用')) && !f.name.includes('補填'));
   const fComp = cat.fields.find(f => f.name.includes('補填') || f.name.includes('保険金'));
+  const fReceipt = cat.fields.find(f => f.name.includes('領収書番号'));
+  const fTarget = cat.fields.find(f => f.name.includes('控除対象'));
 
   if (!fDate || !fHospital || !fPerson || !fType || !fAmount || !fComp) {
      alert('必須項目が見つかりません。'); return;
@@ -5344,14 +5348,20 @@ async function expMedicalExpensesExcel(targetYear = null) {
       return getDt(r);
   };
   const records = [...cat.records]
-    .filter(r => !targetYear || getRecDate(r).getFullYear() === targetYear)
+    .filter(r => (!targetYear || getRecDate(r).getFullYear() === targetYear) && (!fTarget || r[fTarget.id] !== '非対象'))
     .sort((a, b) => getRecDate(a) - getRecDate(b));
 
   records.forEach((r, i) => {
     const no = i + 1;
     const person = (r[fPerson.id] || '').trim();
-    const hospital = (r[fHospital.id] || '').trim();
-    
+    let hospital = (r[fHospital.id] || '').trim();
+
+    if (fReceipt && r[fReceipt.id]) {
+      const receiptStr = String(r[fReceipt.id]);
+      const last3 = receiptStr.slice(-3).padStart(3, '0');
+      hospital = `${last3}_${hospital}`;
+    }
+
     let typeVal = r[fType.id] || '';
     if (Array.isArray(typeVal)) typeVal = typeVal.join(' ');
     typeVal = String(typeVal);
@@ -5422,6 +5432,7 @@ function renderMealReport() {
   // フィールド検索
   const fType = cat.fields.find(f => f.name.includes('区分') || f.name.includes('種別') || f.name.includes('Type'));
   const fContent = cat.fields.find(f => f.name.includes('内容') || f.name.includes('メニュー') || f.name.includes('詳細'));
+  const fContent2 = cat.fields.find(f => f.name.includes('内容２'));
   // 写真フィールド (写真1, 写真2, 写真3 または 画像フィールド全て)
   let fPhotos = cat.fields.filter(f => f.name.includes('写真') || f.name.includes('画像'));
   if (fPhotos.length === 0) fPhotos = cat.fields.filter(f => f.type === 'camera');
