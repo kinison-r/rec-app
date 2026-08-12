@@ -3037,6 +3037,19 @@ function checkForgottenItems() {
 
   const itemLastSeen = {}; // { "薬剤名": Date }
   const itemTodayCount = {}; // { "薬剤名": int }
+
+  // 有効な薬剤名のセット（カテゴリー「薬剤」の項目「薬剤」の選択肢）
+  const validDrugs = new Set();
+  const drugCat = st.cats.find(c => c.name === '薬剤');
+  if (drugCat) {
+    const drugField = drugCat.fields.find(f => f.name === '薬剤');
+    if (drugField && drugField.options) {
+      drugField.options.forEach(o => {
+        const name = typeof o === 'string' ? o : o.text;
+        if (name) validDrugs.add(name);
+      });
+    }
+  }
   
   // 1. 全レコードを走査して、項目の最終利用日時と今日の回数を収集
   st.cats.forEach(c => {
@@ -3055,6 +3068,9 @@ function checkForgottenItems() {
             if (!val) return;
             const items = String(val).split(/[\s,、]+/).filter(s => s);
             items.forEach(item => {
+                // マスタが存在し、その中に名前がない場合はオミットする
+                if (drugCat && validDrugs.size > 0 && !validDrugs.has(item)) return;
+
                 if (!itemLastSeen[item] || dt > itemLastSeen[item]) {
                     itemLastSeen[item] = dt;
                 }
@@ -3068,15 +3084,33 @@ function checkForgottenItems() {
 
   // 2. チェック対象の項目リストを作成
   const stockMap = {};
-  if (st.stock) st.stock.forEach(s => stockMap[s.name] = s);
+  if (st.stock) {
+      st.stock.forEach(s => {
+          if (drugCat && validDrugs.size > 0 && !validDrugs.has(s.name)) return;
+          stockMap[s.name] = s;
+      });
+  }
 
   const checkTargets = new Set();
-  if (st.stock) st.stock.forEach(s => checkTargets.add(s.name));
+  if (st.stock) {
+      st.stock.forEach(s => {
+          if (drugCat && validDrugs.size > 0 && !validDrugs.has(s.name)) return;
+          checkTargets.add(s.name);
+      });
+  }
   st.cats.forEach(c => {
       if (!c.name.includes('薬剤') && !c.name.includes('薬') && !c.name.includes('サプリ')) return;
       c.fields.forEach(f => {
           if (f.name.includes('薬') || f.name.includes('サプリ')) {
-              if (f.options) f.options.forEach(o => checkTargets.add(typeof o === 'string' ? o : o.text));
+              if (f.options) {
+                  f.options.forEach(o => {
+                      const name = typeof o === 'string' ? o : o.text;
+                      if (name) {
+                          if (drugCat && validDrugs.size > 0 && !validDrugs.has(name)) return;
+                          checkTargets.add(name);
+                      }
+                  });
+              }
           }
       });
   });
@@ -3335,9 +3369,25 @@ function collectStockItems(cats, manualStockList, periodMonths) {
   const stockMap = {};
   const remarksMap = {};
   const imagesMap = {};
+
+  // 「カテゴリー『薬剤』の項目『薬剤』」の選択肢（マスター定義）を取得する
+  const validDrugs = new Set();
+  const drugCat = cats.find(c => c.name === '薬剤');
+  if (drugCat) {
+    const drugField = drugCat.fields.find(f => f.name === '薬剤');
+    if (drugField && drugField.options) {
+      drugField.options.forEach(o => {
+        const name = typeof o === 'string' ? o : o.text;
+        if (name) validDrugs.add(name);
+      });
+    }
+  }
   
   if (manualStockList && Array.isArray(manualStockList)) {
     manualStockList.forEach(item => {
+      // マスターが存在し、その中に名前がない場合はオミットする
+      if (drugCat && validDrugs.size > 0 && !validDrugs.has(item.name)) return;
+
       if (item.remarks) remarksMap[item.name] = item.remarks;
       if (item.image) imagesMap[item.name] = item.image;
       
@@ -3377,6 +3427,9 @@ function collectStockItems(cats, manualStockList, periodMonths) {
       const rDt = getDt(r);
 
       drugs.forEach(drugName => {
+        // マスターが存在し、その中に名前がない場合はオミットする
+        if (drugCat && validDrugs.size > 0 && !validDrugs.has(drugName)) return;
+
         const existing = stockMap[drugName];
         if (existing && !existing.isManual) return;
         if (rDt < limitDate) return;
