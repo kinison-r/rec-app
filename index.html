@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -797,7 +797,7 @@
                 <label style="display:flex; align-items:center; font-size:12px; font-weight:bold; border-bottom:1px solid #eee; padding:2px 0; margin-bottom:0; cursor:pointer; position:sticky; top:0; background:#fff; z-index:1; white-space:nowrap;">
                   <input type="checkbox" id="exp-cat-all" onchange="toggleExportAll(this.checked)" checked style="margin-right:4px; flex-shrink:0;"> 全て選択
                 </label>
-                <div id="exp-cat-list"></div>
+                <div id="exp-cat-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 4px; padding-top: 4px;"></div>
             </div>
             <label style="font-size:12px; display:flex; align-items:center; color:#555; cursor:pointer;">
                 <input type="checkbox" id="exp-include-config" checked style="width:auto; margin-right:5px;"> 設定・在庫・外部データも含める (JSON用)
@@ -882,7 +882,16 @@
       <details style="margin-top:10px; border:1px solid #dc3545; border-radius:8px; padding:10px;">
         <summary style="font-weight:bold; cursor:pointer; color:#dc3545;">データ整理（古い記録の削除）</summary>
         <div class="mt-2">
-          <input type="date" id="cl-date">
+          <div style="font-size:12px; font-weight:bold; margin-bottom:5px;">対象カテゴリー</div>
+          <div style="height:150px; resize:vertical; overflow-y:auto; border:1px solid #ddd; padding:2px 5px; background:#fff; border-radius:4px; margin-bottom:10px;">
+              <label style="display:flex; align-items:center; font-size:12px; font-weight:bold; border-bottom:1px solid #eee; padding:2px 0; margin-bottom:0; cursor:pointer; position:sticky; top:0; background:#fff; z-index:1; white-space:nowrap;">
+                <input type="checkbox" id="clean-cat-all" onchange="toggleCleanAll(this.checked)" checked style="margin-right:4px; flex-shrink:0;"> 全て選択
+              </label>
+              <div id="clean-cat-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 4px; padding-top: 4px;"></div>
+          </div>
+          <div style="font-size:12px; font-weight:bold; margin-bottom:5px;">対象期間 (この日以前を削除)</div>
+          <input type="date" id="cl-date" style="margin-bottom:10px;">
+          <br>
           <button class="btn-main" style="background:#dc3545" onclick="clean()">実行（バックアップ＆削除）</button>
         </div>
       </details>
@@ -1578,6 +1587,7 @@ function renderMaintView(c) {
   document.getElementById('sel-f').innerHTML = st.cats.map(makeOpt).join('') || '<option>なし</option>';
   
   renderExportCatList();
+  renderCleanCatList();
 
   rCat();
   if (c) rField(c);
@@ -1639,6 +1649,58 @@ function getSelectedExportCats() {
   const ids = Array.from(chks).map(c => c.value);
   return st.cats.filter(c => ids.includes(c.id));
 }
+function renderCleanCatList() {
+  const list = document.getElementById('clean-cat-list');
+  if (!list) return;
+
+  // 保存された選択状態を取得 (なければ全選択)
+  let selectedIds = null;
+  if (st.settings && st.settings.cleanSelectedCats) {
+    selectedIds = st.settings.cleanSelectedCats;
+  }
+
+  list.innerHTML = st.cats.map(c => {
+    const isChecked = selectedIds ? selectedIds.includes(c.id) : true;
+    return `
+    <label style="display:flex; align-items:center; font-size:12px; padding:1px 0; margin:0; cursor:pointer; white-space:nowrap;">
+      <input type="checkbox" class="clean-cat-chk" value="${c.id}" ${isChecked ? 'checked' : ''} onchange="updateCleanCatSetting()" style="margin-right:4px; flex-shrink:0;"> ${esc(c.name)}
+    </label>
+  `}).join('');
+
+  const allChk = document.getElementById('clean-cat-all');
+  if (allChk) {
+      const allChecked = list.querySelectorAll('.clean-cat-chk:not(:checked)').length === 0;
+      allChk.checked = allChecked;
+  }
+}
+
+function updateCleanCatSetting() {
+  const chks = document.querySelectorAll('.clean-cat-chk:checked');
+  const ids = Array.from(chks).map(c => c.value);
+  
+  if (!st.settings) st.settings = {};
+  st.settings.cleanSelectedCats = ids;
+  saveSettings();
+
+  const allChk = document.getElementById('clean-cat-all');
+  if (allChk) {
+      const list = document.getElementById('clean-cat-list');
+      const allChecked = list && list.querySelectorAll('.clean-cat-chk:not(:checked)').length === 0;
+      allChk.checked = allChecked;
+  }
+}
+
+function toggleCleanAll(checked) {
+  document.querySelectorAll('.clean-cat-chk').forEach(c => c.checked = checked);
+  updateCleanCatSetting();
+}
+
+function getSelectedCleanCats() {
+  const chks = document.querySelectorAll('.clean-cat-chk:checked');
+  const ids = Array.from(chks).map(c => c.value);
+  return st.cats.filter(c => ids.includes(c.id));
+}
+
 
 function renderMaintSettings() {
     const backupSwitch = document.getElementById('realtime-backup-switch');
@@ -5911,6 +5973,13 @@ async function clean() {
   if (!ds) return;
   const target = new Date(ds);
   target.setHours(23, 59, 59, 999);
+  
+  const selectedCats = getSelectedCleanCats();
+  if (selectedCats.length === 0) {
+    alert("対象カテゴリーが選択されていません。");
+    return;
+  }
+
   const ts = getTS();
   const blob = new Blob([JSON.stringify({ format: 'full_backup', version: VERSION, cats: st.cats, stock: st.stock, settings: st.settings, extFiles: st.extFiles }, jsonJstReplacer, 2)], {type:'application/json'});
   const fname = `${VERSION}_${ts}_全件行動ログ.json`;
@@ -5920,7 +5989,7 @@ async function clean() {
   // 削除対象データの保存
   const deletedCats = [];
   let deletedCount = 0;
-  st.cats.forEach(c => {
+  selectedCats.forEach(c => {
     const recsToDelete = c.records.filter(r => getDt(r) <= target);
     if (recsToDelete.length > 0) {
       deletedCats.push({ ...c, records: recsToDelete });
@@ -5935,7 +6004,9 @@ async function clean() {
     if (savedDel) addIoLog('export', delFname, true);
   }
 
-  st.cats.forEach(c => c.records = c.records.filter(r => getDt(r) > target)); // バックアップ保存後に削除
+  selectedCats.forEach(c => {
+    c.records = c.records.filter(r => getDt(r) > target); // バックアップ保存後に削除
+  });
   save(); r(); alert(`整理完了 (削除: ${deletedCount}件)`);
 }
 
